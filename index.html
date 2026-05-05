@@ -774,11 +774,7 @@ if (record.mode === 'replica') {
     else if (mainMatchCount === 3) prize = '🎉 中七獎 ($40)';
     else prize = '❌ 未中獎';
 } 
-            {
-                prize = `命中率 ${avg} / 6`;
-                if (avg >= 3) prize += ' 🎉';
-            }
-            
+          
             record.checked = true;
             saveCheckRecords();
             document.getElementById('checkResult').innerHTML = `<div class="code-box" style="background:#d1fae5;"><div>🎯 核對結果</div><div>命中 ${hitCount} / ${total} 個號碼</div><div>${prize}</div></div>`;
