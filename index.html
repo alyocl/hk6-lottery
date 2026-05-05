@@ -795,7 +795,7 @@ if (record.mode === 'replica') {
     }
     
     async function init() {
-        document.getElementById('mainApp').innerHTML = `<div class="card loading">📡 從 Google Sheets 讀取數據...</div>`;
+        document.getElementById('mainApp').innerHTML = `<div class="card loading">📡 正在載入最新開獎數據...</div>`;
         const records = await loadCsvData();
         if (!records || records.length === 0) {
             document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 讀取失敗，請確認 Google Sheets 已設為「知道連結的人可檢視」</div>`;
