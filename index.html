@@ -248,13 +248,28 @@
             text-align: center;
             color: #dc2626;
         }
+        .footer-links {
+            text-align: center;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+        .footer-links a {
+            color: #f97316;
+            text-decoration: none;
+            margin: 0 10px;
+            font-size: 0.8rem;
+        }
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="card">
         <h1>🤖 六合彩 AI 分析系統 <span class="badge">唯讀展示版</span></h1>
-        <div class="sub">數據來源：Google Sheets (即時讀取) · 每期開獎後更新</div>
+        <div class="sub">數據來源：香港賽馬會官方結果 (每日自動同步) · 每期開獎後更新</div>
     </div>
 
     <div class="mode-tabs">
@@ -267,22 +282,32 @@
     <div id="mainApp">
         <div class="card loading">⏳ 讀取最新開獎數據中...</div>
     </div>
+    
+    <div class="footer-links">
+        <a href="/about.html">關於我們</a> | 
+        <a href="/privacy.html">私隱政策</a>
+    </div>
+    
     <div class="footer-note">
         💡 生成推薦後會獲得核對碼，開獎後憑碼核對命中數
     </div>
 </div>
 
 <script>
-    // ========== Google Sheets CSV 公開連結 (請確認已設為公開) ==========
-    // 直接使用您的試算表 ID 產生的 CSV 匯出連結
+    // Google Sheets CSV 公開連結
     const CSV_URL = "https://docs.google.com/spreadsheets/d/1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw/export?format=csv&gid=0";
     
-    // ========== 全域變數 ==========
+    const MODEL_CONFIG = {
+        lookback: 8,
+        decay_lambda: 0.35,
+        cold_threshold: 6,
+        hot_boost: 1.2
+    };
+    
     let rawData = [];
     let currentMode = "single";
     let checkRecords = {};
 
-    // ========== 核對碼儲存 ==========
     function loadCheckRecords() {
         const saved = localStorage.getItem('lottery_check_records');
         if (saved) {
@@ -318,7 +343,6 @@
         return code;
     }
 
-    // ========== 讀取 Google Sheets CSV 數據 ==========
     async function loadCsvData() {
         try {
             console.log("正在讀取:", CSV_URL);
@@ -331,11 +355,9 @@
             if (lines.length < 2) throw new Error("資料不足");
             
             const records = [];
-            // 假設第一行標題: n1, n2, n3, n4, n5, n6, special
             for (let i=1; i<lines.length; i++) {
                 const parts = lines[i].split(',').map(v => parseInt(v,10));
                 if (parts.length < 7) continue;
-                // 檢查是否為有效數字
                 if (parts.slice(0,7).every(v => !isNaN(v) && v >= 1 && v <= 49)) {
                     records.push({
                         n1: parts[0], n2: parts[1], n3: parts[2],
@@ -352,13 +374,9 @@
         }
     }
     
-    // ========== 核心模型函數 ==========
     function getScores(dataSeries, currentIdx) {
         const score = new Array(50).fill(0);
-        const lookback = 8;
-        const decay_lambda = 0.35;
-        const cold_threshold = 6;
-        const hot_boost = 1.2;
+        const { lookback, decay_lambda, cold_threshold, hot_boost } = MODEL_CONFIG;
         const start = Math.max(0, currentIdx - lookback);
         
         for (let offset = 0; offset < currentIdx - start; offset++) {
@@ -469,26 +487,6 @@
         return tickets;
     }
     
-    // ========== 輔助函數 ==========
-    function formatDate(timestamp) {
-        const d = new Date(timestamp);
-        return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${d.getMinutes().toString().padStart(2,'0')}`;
-    }
-    
-    function getLatestInfo(data) {
-        if (!data || data.length === 0) return null;
-        const latest = data[0];
-        return { latest, total: data.length };
-    }
-    
-    // 生成期數顯示 (假設最新一期從 26/047 開始遞減)
-    function getIssueNumber(index) {
-        let num = 47 - index;
-        if (num >= 1) return `26/${num.toString().padStart(3,'0')}`;
-        else return `期數_${index+1}`;
-    }
-    
-    // ========== 單式模式 ==========
     async function renderSingle() {
         if (!rawData || rawData.length === 0) {
             document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 數據載入失敗，請檢查 Google Sheets 是否公開</div>`;
@@ -497,18 +495,16 @@
         const latest = rawData[0];
         const total = rawData.length;
         
-        // 顯示最近5期
         let recentHtml = '';
         for (let i=0; i<Math.min(5, rawData.length); i++) {
             const r = rawData[i];
-            const issueNum = getIssueNumber(i);
-            recentHtml += `<div class="recent-item"><strong>${issueNum}</strong> ${r.n1},${r.n2},${r.n3},${r.n4},${r.n5},${r.n6}</div>`;
+            recentHtml += `<div class="recent-item"><strong>${i===0?'最新':`${i+1}`}</strong> ${r.n1},${r.n2},${r.n3},${r.n4},${r.n5},${r.n6}</div>`;
         }
         
         const html = `
             <div class="card">
                 <div class="latest-box">
-                    <strong>✨ 最新一期 <span style="color:#eab308;">${getIssueNumber(0)}</span></strong><br>
+                    <strong>✨ 最新一期</strong><br>
                     <span style="font-size:1.4rem; font-weight:800;">${latest.n1}  ${latest.n2}  ${latest.n3}  ${latest.n4}  ${latest.n5}  ${latest.n6}</span>
                     <span class="special-number">特 ${latest.special}</span>
                 </div>
@@ -538,7 +534,6 @@
         };
     }
     
-    // ========== 複式模式 ==========
     async function renderReplica() {
         if (!rawData || rawData.length === 0) {
             document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 數據載入失敗</div>`;
@@ -550,7 +545,7 @@
         for (let i = 7; i <= 20; i++) selectOptions += `<option value="${i}">${i} 個號碼</option>`;
         
         const html = `
-            <div class="card"><div class="latest-box"><strong>✨ 最新一期 ${getIssueNumber(0)}</strong><br>
+            <div class="card"><div class="latest-box"><strong>✨ 最新一期</strong><br>
                 <span>${latest.n1},${latest.n2},${latest.n3},${latest.n4},${latest.n5},${latest.n6}</span>
                 <span class="special-number">特 ${latest.special}</span>
             </div></div>
@@ -584,7 +579,6 @@
         };
     }
 
-    // ========== 膽拖模式 ==========
     async function renderDanTuo() {
         if (!rawData || rawData.length === 0) {
             document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 數據載入失敗</div>`;
@@ -596,7 +590,7 @@
         for (let i = 1; i <= 5; i++) danOptions += `<option value="${i}">${i} 個膽碼</option>`;
         
         const html = `
-            <div class="card"><div class="latest-box"><strong>✨ 最新一期 ${getIssueNumber(0)}</strong><br>
+            <div class="card"><div class="latest-box"><strong>✨ 最新一期</strong><br>
                 <span>${latest.n1},${latest.n2},${latest.n3},${latest.n4},${latest.n5},${latest.n6}</span>
                 <span class="special-number">特 ${latest.special}</span>
             </div></div>
@@ -648,11 +642,9 @@
         updateTuo();
     }
 
-      // ========== 核對模式 (只保留最近3個月記錄) ==========
     async function renderCheck() {
         loadCheckRecords();
         
-        // 自動清理超過 3 個月的記錄 (90天)
         const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
         const now = Date.now();
         let cleanedCount = 0;
@@ -668,31 +660,27 @@
             console.log(`已清理 ${cleanedCount} 筆超過3個月的核對記錄`);
         }
         
-        // 顯示目前的記錄（只顯示90天內）
         let historyHtml = '';
         const list = Object.entries(checkRecords).reverse();
         if (list.length === 0) {
             historyHtml = '<div style="text-align:center; color:#666;">📭 暫無核對記錄（系統只保留最近3個月）</div>';
         } else {
             for (let [code, rec] of list) {
+                let modeName = rec.mode === 'single' ? '單式' : (rec.mode === 'replica' ? '複式' : '膽拖');
+                let details = rec.mode === 'single' ? `${rec.params.betCount}注` : (rec.mode === 'replica' ? `${rec.params.count}碼` : `${rec.params.danCount}膽+${rec.params.tuoCount}拖`);
                 const timestamp = new Date(rec.timestamp).getTime();
                 const daysOld = Math.floor((now - timestamp) / (24*60*60*1000));
                 const daysLeft = 90 - daysOld;
-                
-                let modeName = rec.mode === 'single' ? '單式' : (rec.mode === 'replica' ? '複式' : '膽拖');
-                let details = rec.mode === 'single' ? `${rec.params.betCount}注` : (rec.mode === 'replica' ? `${rec.params.count}碼` : `${rec.params.danCount}膽+${rec.params.tuoCount}拖`);
-                
                 historyHtml += `<div class="history-item">
                     <strong>🔑 ${code}</strong> - ${modeName} (${details})<br>
-                    <span style="font-size:0.75rem;">📅 ${formatDate(rec.timestamp)} · 剩餘 ${daysLeft} 天</span>
+                    <span style="font-size:0.75rem;">📅 ${new Date(rec.timestamp).toLocaleString()} · 剩餘 ${daysLeft} 天</span>
                     ${rec.checked ? '<span style="float:right; color:#10b981;">✅ 已核對</span>' : ''}
                 </div>`;
             }
         }
         
-        // 顯示保留期限說明
         const infoHtml = `<div style="background:#eef2ff; border-radius:1rem; padding:0.8rem; margin-bottom:1rem; text-align:center; font-size:0.8rem;">
-            ⏰ 系統只保留 <strong>最近3個月</strong> 的生成記錄，超過90天會自動清除。
+            ⏰ 系統只保留 <strong>最近3個月</strong> 的核對記錄，超過90天會自動清除。
         </div>`;
         
         const html = `
@@ -728,12 +716,10 @@
                 return;
             }
             
-            // 再次檢查是否過期
             const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
             const now = Date.now();
             const timestamp = new Date(record.timestamp).getTime();
             if (now - timestamp > THREE_MONTHS_MS) {
-                // 如果過期，刪除並提示
                 delete checkRecords[code];
                 saveCheckRecords();
                 document.getElementById('checkResult').innerHTML = `<div class="error-box">❌ 此核對碼記錄已超過3個月，已被系統自動清除，無法核對</div>`;
@@ -777,7 +763,6 @@
         };
     }
     
-    // ========== 模式切換 ==========
     function switchMode(mode) {
         currentMode = mode;
         document.querySelectorAll('.mode-tab').forEach((tab, idx) => {
@@ -790,18 +775,16 @@
         else renderCheck();
     }
     
-    // ========== 初始化 ==========
     async function init() {
-        document.getElementById('mainApp').innerHTML = `<div class="card loading">📡 從 Google Sheets 讀取 ${CSV_URL}<br>⏳ 請稍候...</div>`;
+        document.getElementById('mainApp').innerHTML = `<div class="card loading">📡 從 Google Sheets 讀取數據...</div>`;
         const records = await loadCsvData();
         if (!records || records.length === 0) {
-            document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 讀取失敗，請確認 Google Sheets 已設為「知道連結的人可檢視」<br><br>🔗 目前使用的連結：<br><code style="font-size:0.7rem; word-break:break-all;">${CSV_URL}</code></div>`;
+            document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 讀取失敗，請確認 Google Sheets 已設為「知道連結的人可檢視」</div>`;
             return;
         }
         rawData = records;
         console.log("數據載入成功，共", rawData.length, "期");
         
-        // 綁定事件
         document.getElementById('singleModeTab').onclick = () => switchMode('single');
         document.getElementById('replicaModeTab').onclick = () => switchMode('replica');
         document.getElementById('danTuoModeTab').onclick = () => switchMode('danTuo');
