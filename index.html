@@ -773,7 +773,8 @@ if (record.mode === 'replica') {
     else if (mainMatchCount === 3 && hasSpecialMatch) prize = '🎉 中六獎 ($320)';
     else if (mainMatchCount === 3) prize = '🎉 中七獎 ($40)';
     else prize = '❌ 未中獎';
-} else {
+} 
+            {
                 prize = `命中率 ${avg} / 6`;
                 if (avg >= 3) prize += ' 🎉';
             }
