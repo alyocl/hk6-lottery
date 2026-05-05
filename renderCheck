@@ -657,7 +657,7 @@
         updateTuo();
     }
 
-    async function renderCheck() {
+        async function renderCheck() {
         loadCheckRecords();
         
         const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
@@ -702,7 +702,8 @@
             <div class="card">
                 <div><strong>🔍 輸入核對碼與開獎號碼</strong></div>
                 <div class="bet-selector"><label>📌 核對碼：</label><input type="text" id="checkCode" placeholder="例如 A3B9X7" style="padding:10px; width:150px; text-align:center;"></div>
-                <div class="bet-selector"><label>🎲 開獎號碼 (6個)：</label><input type="text" id="drawNumbers" placeholder="5,18,22,31,44,48" style="width:100%; padding:10px;"></div>
+                <div class="bet-selector"><label>🎲 開獎正碼 (6個)：</label><input type="text" id="drawNumbers" placeholder="5,18,22,31,44,48" style="width:100%; padding:10px;"></div>
+                <div class="bet-selector"><label>⭐ 特別號 (1個)：</label><input type="text" id="specialNumber" placeholder="例如 9" style="width:100%; padding:10px;"></div>
                 <button id="doCheckBtn">🔍 核對中獎</button>
                 <div id="checkResult"></div>
             </div>
@@ -717,11 +718,21 @@
         document.getElementById('doCheckBtn').onclick = () => {
             const code = document.getElementById('checkCode').value.trim().toUpperCase();
             const drawInput = document.getElementById('drawNumbers').value.trim();
+            const specialInput = document.getElementById('specialNumber').value.trim();
+            
             if (!code) { alert('請輸入核對碼'); return; }
-            if (!drawInput) { alert('請輸入開獎號碼'); return; }
+            if (!drawInput) { alert('請輸入開獎正碼'); return; }
+            if (!specialInput) { alert('請輸入特別號'); return; }
+            
             const drawNumbers = drawInput.split(',').map(n => parseInt(n.trim(), 10));
+            const specialNumber = parseInt(specialInput, 10);
+            
             if (drawNumbers.length !== 6 || drawNumbers.some(isNaN)) {
-                alert('請輸入6個號碼，用逗號分隔');
+                alert('請輸入6個正碼，用逗號分隔');
+                return;
+            }
+            if (isNaN(specialNumber) || specialNumber < 1 || specialNumber > 49) {
+                alert('請輸入1-49之間的特別號');
                 return;
             }
             
@@ -731,6 +742,7 @@
                 return;
             }
             
+            // 檢查是否過期
             const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
             const now = Date.now();
             const timestamp = new Date(record.timestamp).getTime();
@@ -757,29 +769,28 @@
                 hitCount += record.data.tuo.filter(n => drawNumbers.includes(n)).length;
             }
             
-            const avg = (hitCount / total * 6).toFixed(2);
-      let prize = '';
-if (record.mode === 'replica') {
-    const matchCount = record.data.filter(n => drawNumbers.includes(n)).length;
-    if (matchCount === 6) prize = '🏆 恭喜中頭獎！';
-    else if (matchCount === 5) prize = '🎉 中三獎';
-    else if (matchCount === 4) prize = '🎉 中五獎 ($640)';
-    else if (matchCount === 3) prize = '🎉 中七獎 ($40)';
-    else prize = '❌ 未中獎';
-} else {
-    const mainMatchCount = record.data.filter(n => drawNumbers.includes(n)).length;
-    const hasSpecialMatch = record.special === drawNumbers.special ? 1 : 0;
-    
-    if (mainMatchCount === 6) prize = '🏆 恭喜中頭獎！';
-    else if (mainMatchCount === 5 && hasSpecialMatch) prize = '🎉 中二獎';
-    else if (mainMatchCount === 5) prize = '🎉 中三獎';
-    else if (mainMatchCount === 4 && hasSpecialMatch) prize = '🎉 中四獎 ($9,600)';
-    else if (mainMatchCount === 4) prize = '🎉 中五獎 ($640)';
-    else if (mainMatchCount === 3 && hasSpecialMatch) prize = '🎉 中六獎 ($320)';
-    else if (mainMatchCount === 3) prize = '🎉 中七獎 ($40)';
-    else prize = '❌ 未中獎';
-} 
-          
+            let prize = '';
+            if (record.mode === 'replica') {
+                const matchCount = record.data.filter(n => drawNumbers.includes(n)).length;
+                if (matchCount === 6) prize = '🏆 恭喜中頭獎！';
+                else if (matchCount === 5) prize = '🎉 中三獎';
+                else if (matchCount === 4) prize = '🎉 中五獎 ($640)';
+                else if (matchCount === 3) prize = '🎉 中七獎 ($40)';
+                else prize = '❌ 未中獎';
+            } else {
+                const mainMatchCount = record.data.filter(n => drawNumbers.includes(n)).length;
+                const hasSpecialMatch = record.special === specialNumber ? 1 : 0;
+                
+                if (mainMatchCount === 6) prize = '🏆 恭喜中頭獎！';
+                else if (mainMatchCount === 5 && hasSpecialMatch) prize = '🎉 中二獎';
+                else if (mainMatchCount === 5) prize = '🎉 中三獎';
+                else if (mainMatchCount === 4 && hasSpecialMatch) prize = '🎉 中四獎 ($9,600)';
+                else if (mainMatchCount === 4) prize = '🎉 中五獎 ($640)';
+                else if (mainMatchCount === 3 && hasSpecialMatch) prize = '🎉 中六獎 ($320)';
+                else if (mainMatchCount === 3) prize = '🎉 中七獎 ($40)';
+                else prize = '❌ 未中獎';
+            }
+            
             record.checked = true;
             saveCheckRecords();
             document.getElementById('checkResult').innerHTML = `<div class="code-box" style="background:#d1fae5;"><div>🎯 核對結果</div><div>命中 ${hitCount} / ${total} 個號碼</div><div>${prize}</div></div>`;
