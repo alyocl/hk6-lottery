@@ -762,15 +762,27 @@
             }
             
             const avg = (hitCount / total * 6).toFixed(2);
-            let prize = '';
-            if (record.mode === 'replica') {
-                const matchCount = record.data.filter(n => drawNumbers.includes(n)).length;
-                if (matchCount >= 6) prize = '🏆 恭喜中頭獎！';
-                else if (matchCount === 5) prize = '🎉 中 $20,000';
-                else if (matchCount === 4) prize = '🎉 中 $1,000';
-                else if (matchCount === 3) prize = '🎉 中 $40';
-                else prize = '❌ 未中獎';
-            } else {
+      let prize = '';
+if (record.mode === 'replica') {
+    const matchCount = record.data.filter(n => drawNumbers.includes(n)).length;
+    if (matchCount === 6) prize = '🏆 恭喜中頭獎！';
+    else if (matchCount === 5) prize = '🎉 中三獎';
+    else if (matchCount === 4) prize = '🎉 中五獎 ($640)';
+    else if (matchCount === 3) prize = '🎉 中七獎 ($40)';
+    else prize = '❌ 未中獎';
+} else {
+    const mainMatchCount = record.data.filter(n => drawNumbers.includes(n)).length;
+    const hasSpecialMatch = record.special === drawNumbers.special ? 1 : 0;
+    
+    if (mainMatchCount === 6) prize = '🏆 恭喜中頭獎！';
+    else if (mainMatchCount === 5 && hasSpecialMatch) prize = '🎉 中二獎';
+    else if (mainMatchCount === 5) prize = '🎉 中三獎';
+    else if (mainMatchCount === 4 && hasSpecialMatch) prize = '🎉 中四獎 ($9,600)';
+    else if (mainMatchCount === 4) prize = '🎉 中五獎 ($640)';
+    else if (mainMatchCount === 3 && hasSpecialMatch) prize = '🎉 中六獎 ($320)';
+    else if (mainMatchCount === 3) prize = '🎉 中七獎 ($40)';
+    else prize = '❌ 未中獎';
+} else {
                 prize = `命中率 ${avg} / 6`;
                 if (avg >= 3) prize += ' 🎉';
             }
