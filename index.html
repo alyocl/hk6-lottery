@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>六合彩 AI 分析系統 | 智能預測</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans TC', sans-serif;
+        }
+        body {
+            background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 750px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(2px);
+            border-radius: 2rem;
+            padding: 1.5rem;
+            box-shadow: 0 20px 35px -10px rgba(0,0,0,0.4);
+        }
+        .card {
+            background: white;
+            border-radius: 1.5rem;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin: 0 0 0.25rem 0;
+            font-size: 1.8rem;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .badge {
+            background: #10b981;
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 40px;
+        }
+        .sub {
+            color: #475569;
+            font-size: 0.85rem;
+            border-left: 3px solid #f97316;
+            padding-left: 0.75rem;
+            margin-top: 6px;
+        }
+        .mode-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .mode-tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            background: #f1f5f9;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+        .mode-tab.active {
+            background: #f97316;
+            color: white;
+        }
+        .latest-box {
+            background: #fef9c3;
+            border-left: 5px solid #eab308;
+            border-radius: 1rem;
+            padding: 0.75rem 1rem;
+            margin: 0.75rem 0;
+        }
+        .special-number {
+            background: #d1fae5;
+            padding: 4px 12px;
+            border-radius: 50px;
+            margin-left: 8px;
+            font-weight: bold;
+            color: #065f46;
+            display: inline-block;
+        }
+        .ticket-row {
+            background: #f1f5f9;
+            border-radius: 1rem;
+            padding: 0.8rem 1rem;
+            margin-bottom: 0.75rem;
+            font-family: monospace;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        button {
+            background: #f97316;
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 60px;
+            width: 100%;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #ea580c;
+            transform: scale(0.98);
+        }
+        .bet-selector {
+            background: #f8fafc;
+            border-radius: 1rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+        .bet-selector label {
+            font-weight: 600;
+            color: #1e293b;
+            margin-right: 15px;
+            font-size: 1rem;
+        }
+        select {
+            padding: 10px 20px;
+            border-radius: 50px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .footer-note {
+            color: #cbd5e1;
+            text-align: center;
+            font-size: 0.7rem;
+            margin-top: 1rem;
+        }
+        .loading {
+            text-align: center;
+            color: #475569;
+            padding: 2rem;
+        }
+        .stats-text {
+            background: #eef2ff;
+            border-radius: 1rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+        .recent-item {
+            display: inline-block;
+            background: #eef2ff;
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        .number-badge {
+            display: inline-block;
+            background: #334155;
+            color: white;
+            width: 36px;
+            height: 36px;
+            line-height: 36px;
+            text-align: center;
+            border-radius: 40px;
+            margin: 4px;
+            font-weight: bold;
+        }
+        .combo-info {
+            background: #eef2ff;
+            border-radius: 1rem;
+            padding: 1rem;
+            margin: 10px 0;
+            text-align: center;
+        }
+        .price-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .price-btn {
+            flex: 1;
+            padding: 10px;
+            background: #e2e8f0;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 0;
+        }
+        .price-btn.active {
+            background: #f97316;
+            color: white;
+        }
+        .hidden {
+            display: none;
+        }
+        .row-2cols {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .col {
+            flex: 1;
+        }
+        .info-text {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 5px;
+        }
+        .code-box {
+            background: #f1f5f9;
+            border-radius: 1rem;
+            padding: 0.8rem;
+            text-align: center;
+            margin: 15px 0;
+            border: 2px dashed #f97316;
+        }
+        .code {
+            font-size: 1.6rem;
+            font-weight: bold;
+            font-family: monospace;
+            letter-spacing: 4px;
+            color: #f97316;
+        }
+        .history-item {
+            background: #f8fafc;
+            border-radius: 1rem;
+            padding: 0.8rem;
+            margin-bottom: 0.8rem;
+            border-left: 4px solid #f97316;
+        }
+        .error-box {
+            background: #fee2e2;
+            border-radius: 1rem;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+            color: #dc2626;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <h1>🤖 六合彩 AI 分析系統 <span class="badge">唯讀展示版</span></h1>
+        <div class="sub">數據來源：Google Sheets (即時讀取) · 每期開獎後更新</div>
+    </div>
+
+    <div class="mode-tabs">
+        <div class="mode-tab active" id="singleModeTab">📌 單式</div>
+        <div class="mode-tab" id="replicaModeTab">🔢 複式</div>
+        <div class="mode-tab" id="danTuoModeTab">🎯 膽拖</div>
+        <div class="mode-tab" id="checkModeTab">🔍 核對中獎</div>
+    </div>
+
+    <div id="mainApp">
+        <div class="card loading">⏳ 讀取最新開獎數據中...</div>
+    </div>
+    <div class="footer-note">
+        💡 生成推薦後會獲得核對碼，開獎後憑碼核對命中數
+    </div>
+</div>
+
+<script>
+    // ========== Google Sheets CSV 公開連結 (請確認已設為公開) ==========
+    // 直接使用您的試算表 ID 產生的 CSV 匯出連結
+    const CSV_URL = "https://docs.google.com/spreadsheets/d/1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw/export?format=csv&gid=0";
+    
+    // ========== 全域變數 ==========
+    let rawData = [];
+    let currentMode = "single";
+    let checkRecords = {};
+
+    // ========== 核對碼儲存 ==========
+    function loadCheckRecords() {
+        const saved = localStorage.getItem('lottery_check_records');
+        if (saved) {
+            try {
+                checkRecords = JSON.parse(saved);
+            } catch(e) { console.error(e); }
+        }
+    }
+
+    function saveCheckRecords() {
+        localStorage.setItem('lottery_check_records', JSON.stringify(checkRecords));
+    }
+
+    function generateCheckCode() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let code = '';
+        for (let i = 0; i < 6; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+    }
+
+    function savePrediction(mode, params, data) {
+        const code = generateCheckCode();
+        checkRecords[code] = {
+            mode: mode,
+            params: params,
+            data: data,
+            timestamp: new Date().toISOString(),
+            checked: false
+        };
+        saveCheckRecords();
+        return code;
+    }
+
+    // ========== 讀取 Google Sheets CSV 數據 ==========
+    async function loadCsvData() {
+        try {
+            console.log("正在讀取:", CSV_URL);
+            const response = await fetch(CSV_URL, { cache: "no-store" });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const text = await response.text();
+            console.log("讀取到資料長度:", text.length);
+            
+            const lines = text.trim().split(/\r?\n/);
+            if (lines.length < 2) throw new Error("資料不足");
+            
+            const records = [];
+            // 假設第一行標題: n1, n2, n3, n4, n5, n6, special
+            for (let i=1; i<lines.length; i++) {
+                const parts = lines[i].split(',').map(v => parseInt(v,10));
+                if (parts.length < 7) continue;
+                // 檢查是否為有效數字
+                if (parts.slice(0,7).every(v => !isNaN(v) && v >= 1 && v <= 49)) {
+                    records.push({
+                        n1: parts[0], n2: parts[1], n3: parts[2],
+                        n4: parts[3], n5: parts[4], n6: parts[5], special: parts[6]
+                    });
+                }
+            }
+            if (records.length === 0) throw new Error("沒有有效號碼");
+            console.log("成功載入", records.length, "期數據");
+            return records;
+        } catch (err) {
+            console.error("載入失敗:", err);
+            return null;
+        }
+    }
+    
+    // ========== 核心模型函數 ==========
+    function getScores(dataSeries, currentIdx) {
+        const score = new Array(50).fill(0);
+        const lookback = 8;
+        const decay_lambda = 0.35;
+        const cold_threshold = 6;
+        const hot_boost = 1.2;
+        const start = Math.max(0, currentIdx - lookback);
+        
+        for (let offset = 0; offset < currentIdx - start; offset++) {
+            const t = start + offset;
+            const age = currentIdx - t - 1;
+            const w = Math.exp(-decay_lambda * age);
+            const row = dataSeries[t];
+            for (let col of ['n1','n2','n3','n4','n5','n6']) {
+                score[row[col]] += w;
+            }
+        }
+        
+        const lastSeen = new Array(50).fill(-1);
+        for (let t = currentIdx-1; t >= 0; t--) {
+            const row = dataSeries[t];
+            for (let col of ['n1','n2','n3','n4','n5','n6']) {
+                const num = row[col];
+                if (lastSeen[num] === -1) lastSeen[num] = t;
+            }
+        }
+        const coldScore = new Array(50).fill(0);
+        for (let i=1;i<=49;i++) {
+            const d = (lastSeen[i] === -1) ? 999 : (currentIdx - lastSeen[i] - 1);
+            if (d > cold_threshold) {
+                coldScore[i] = Math.min(1.5, (d - cold_threshold) / 8);
+            }
+        }
+        
+        const hotScore = new Array(50).fill(0);
+        for (let i=1;i<=49;i++) {
+            let cnt = 0;
+            for (let t = Math.max(0, currentIdx-2); t < currentIdx; t++) {
+                const row = dataSeries[t];
+                if ([row.n1,row.n2,row.n3,row.n4,row.n5,row.n6].includes(i)) cnt++;
+            }
+            if (cnt > 0) hotScore[i] = hot_boost * cnt * 1.5;
+        }
+        
+        let avoidScore = new Array(50).fill(0);
+        for (let i=1;i<=31;i++) avoidScore[i] += 0.2;
+        if (currentIdx > 0) {
+            const prev = dataSeries[currentIdx-1];
+            for (let col of ['n1','n2','n3','n4','n5','n6']) {
+                avoidScore[prev[col]] += 0.5;
+            }
+        }
+        
+        const final = new Array(50);
+        for (let i=0;i<=49;i++) {
+            final[i] = 0.35*score[i] + 0.30*coldScore[i] + 0.25*hotScore[i] - 0.10*avoidScore[i];
+        }
+        return final;
+    }
+    
+    function getTopNumbers(dataSeries, count, exclude = []) {
+        const currentIdx = dataSeries.length;
+        const final = getScores(dataSeries, currentIdx);
+        let candidates = Array.from({length:49}, (_,i)=>i+1);
+        candidates = candidates.filter(c => !exclude.includes(c));
+        candidates.sort((a,b)=> final[b] - final[a]);
+        return candidates.slice(0, count).sort((a,b)=>a-b);
+    }
+    
+    function combination(n, k) {
+        if (k > n) return 0;
+        let result = 1;
+        for (let i = 1; i <= k; i++) {
+            result = result * (n - k + i) / i;
+        }
+        return Math.round(result);
+    }
+    
+    function predictTicketsFixed(dataSeries, nTickets) {
+        const currentIdx = dataSeries.length;
+        const final = getScores(dataSeries, currentIdx);
+        let candidates = Array.from({length:49}, (_,i)=>i+1);
+        candidates.sort((a,b)=> final[b] - final[a]);
+        const top20 = candidates.slice(0,20);
+        
+        const tickets = [];
+        let seed = 12345;
+        function fixedRandom() {
+            seed = (seed * 9301 + 49297) % 233280;
+            return seed / 233280;
+        }
+        
+        for (let t=0; t<nTickets; t++) {
+            let selected = [];
+            let available = [...top20];
+            let weights = available.map(v => Math.max(final[v], 0.01));
+            
+            for (let s=0; s<6; s++) {
+                let total = weights.reduce((a,b)=>a+b,0);
+                let rand = fixedRandom() * total;
+                let idx = 0;
+                let acc = 0;
+                while(acc + weights[idx] < rand && idx < weights.length-1) {
+                    acc += weights[idx];
+                    idx++;
+                }
+                selected.push(available[idx]);
+                available.splice(idx,1);
+                weights.splice(idx,1);
+            }
+            selected.sort((a,b)=>a-b);
+            tickets.push(selected);
+        }
+        return tickets;
+    }
+    
+    // ========== 輔助函數 ==========
+    function formatDate(timestamp) {
+        const d = new Date(timestamp);
+        return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${d.getMinutes().toString().padStart(2,'0')}`;
+    }
+    
+    function getLatestInfo(data) {
+        if (!data || data.length === 0) return null;
+        const latest = data[0];
+        return { latest, total: data.length };
+    }
+    
+    // 生成期數顯示 (假設最新一期從 26/047 開始遞減)
+    function getIssueNumber(index) {
+        let num = 47 - index;
+        if (num >= 1) return `26/${num.toString().padStart(3,'0')}`;
+        else return `期數_${index+1}`;
+    }
+    
+    // ========== 單式模式 ==========
+    async function renderSingle() {
+        if (!rawData || rawData.length === 0) {
+            document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 數據載入失敗，請檢查 Google Sheets 是否公開</div>`;
+            return;
+        }
+        const latest = rawData[0];
+        const total = rawData.length;
+        
+        // 顯示最近5期
+        let recentHtml = '';
+        for (let i=0; i<Math.min(5, rawData.length); i++) {
+            const r = rawData[i];
+            const issueNum = getIssueNumber(i);
+            recentHtml += `<div class="recent-item"><strong>${issueNum}</strong> ${r.n1},${r.n2},${r.n3},${r.n4},${r.n5},${r.n6}</div>`;
+        }
+        
+        const html = `
+            <div class="card">
+                <div class="latest-box">
+                    <strong>✨ 最新一期 <span style="color:#eab308;">${getIssueNumber(0)}</span></strong><br>
+                    <span style="font-size:1.4rem; font-weight:800;">${latest.n1}  ${latest.n2}  ${latest.n3}  ${latest.n4}  ${latest.n5}  ${latest.n6}</span>
+                    <span class="special-number">特 ${latest.special}</span>
+                </div>
+                <div><strong>📜 最近5期 (最新在上)</strong><br>${recentHtml}</div>
+                <div style="margin-top:10px;"><strong>📆 總期數：${total}</strong></div>
+            </div>
+            <div class="bet-selector">
+                <label>🎲 選擇注數：</label>
+                <select id="betSelect">
+                    <option value="1">1 注</option><option value="2">2 注</option>
+                    <option value="3">3 注</option><option value="4" selected>4 注</option>
+                </select>
+            </div>
+            <div class="card" id="resultPanel"><div style="text-align:center;">⚡ 點擊下方按鈕生成預測</div></div>
+            <button id="predictBtn">🔮 開始預測</button>
+        `;
+        document.getElementById('mainApp').innerHTML = html;
+        
+        document.getElementById('predictBtn').onclick = () => {
+            const betVal = parseInt(document.getElementById('betSelect').value);
+            const tickets = predictTicketsFixed(rawData, betVal);
+            const code = savePrediction('single', { betCount: betVal }, tickets);
+            let resultHtml = `<div><strong>🎯 推薦 ${betVal} 注</strong></div>`;
+            tickets.forEach((t,i) => resultHtml += `<div class="ticket-row">注 ${i+1}： ${t.join(', ')}</div>`);
+            resultHtml += `<div class="code-box"><div>📌 您的核對碼</div><div class="code">${code}</div><div style="font-size:0.8rem;">💡 開獎後到「核對中獎」輸入此碼</div></div>`;
+            document.getElementById('resultPanel').innerHTML = resultHtml;
+        };
+    }
+    
+    // ========== 複式模式 ==========
+    async function renderReplica() {
+        if (!rawData || rawData.length === 0) {
+            document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 數據載入失敗</div>`;
+            return;
+        }
+        const latest = rawData[0];
+        
+        let selectOptions = "";
+        for (let i = 7; i <= 20; i++) selectOptions += `<option value="${i}">${i} 個號碼</option>`;
+        
+        const html = `
+            <div class="card"><div class="latest-box"><strong>✨ 最新一期 ${getIssueNumber(0)}</strong><br>
+                <span>${latest.n1},${latest.n2},${latest.n3},${latest.n4},${latest.n5},${latest.n6}</span>
+                <span class="special-number">特 ${latest.special}</span>
+            </div></div>
+            <div class="card">
+                <div class="bet-selector"><label>📊 選擇號碼數量：</label><select id="replicaCountSelect">${selectOptions}</select></div>
+                <div class="price-buttons"><button id="price5Btn" class="price-btn">$5 / 注</button><button id="price10Btn" class="price-btn active">$10 / 注</button></div>
+                <button id="generateReplicaBtn">🔮 開始預測</button>
+            </div>
+            <div class="card hidden" id="replicaResultPanel"></div>
+        `;
+        document.getElementById('mainApp').innerHTML = html;
+        
+        let currentPrice = 10;
+        document.getElementById('price10Btn').classList.add('active');
+        document.getElementById('price5Btn').onclick = () => { currentPrice = 5; document.getElementById('price5Btn').classList.add('active'); document.getElementById('price10Btn').classList.remove('active'); };
+        document.getElementById('price10Btn').onclick = () => { currentPrice = 10; document.getElementById('price10Btn').classList.add('active'); document.getElementById('price5Btn').classList.remove('active'); };
+        
+        document.getElementById('generateReplicaBtn').onclick = () => {
+            const count = parseInt(document.getElementById('replicaCountSelect').value);
+            const topNumbers = getTopNumbers(rawData, count);
+            const comboCount = combination(count, 6);
+            const totalAmount = comboCount * currentPrice;
+            const code = savePrediction('replica', { count, price: currentPrice }, topNumbers);
+            
+            let numbersHtml = `<div class="combo-info"><strong>🎲 推薦 ${count} 個號碼</strong><br>`;
+            topNumbers.forEach(n => numbersHtml += `<span class="number-badge">${n}</span>`);
+            numbersHtml += `</div><div class="combo-info">C(${count},6) = ${comboCount.toLocaleString()} 注<br><strong>總金額：$${totalAmount.toLocaleString()}</strong></div>`;
+            numbersHtml += `<div class="code-box"><div>📌 您的核對碼</div><div class="code">${code}</div><div style="font-size:0.8rem;">💡 開獎後到「核對中獎」輸入此碼</div></div>`;
+            document.getElementById('replicaResultPanel').innerHTML = numbersHtml;
+            document.getElementById('replicaResultPanel').classList.remove('hidden');
+        };
+    }
+
+    // ========== 膽拖模式 ==========
+    async function renderDanTuo() {
+        if (!rawData || rawData.length === 0) {
+            document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 數據載入失敗</div>`;
+            return;
+        }
+        const latest = rawData[0];
+        
+        let danOptions = "";
+        for (let i = 1; i <= 5; i++) danOptions += `<option value="${i}">${i} 個膽碼</option>`;
+        
+        const html = `
+            <div class="card"><div class="latest-box"><strong>✨ 最新一期 ${getIssueNumber(0)}</strong><br>
+                <span>${latest.n1},${latest.n2},${latest.n3},${latest.n4},${latest.n5},${latest.n6}</span>
+                <span class="special-number">特 ${latest.special}</span>
+            </div></div>
+            <div class="card">
+                <div class="row-2cols"><div class="col"><label>🎲 膽碼數量：</label><select id="danCountSelect">${danOptions}</select></div>
+                <div class="col"><label>📊 拖碼數量：</label><select id="tuoCountSelect"></select><div id="tuoHint" class="info-text"></div></div></div>
+                <div class="price-buttons"><button id="danPrice5Btn" class="price-btn">$5 / 注</button><button id="danPrice10Btn" class="price-btn active">$10 / 注</button></div>
+                <button id="generateDanTuoBtn">🔮 開始預測</button>
+            </div>
+            <div class="card hidden" id="danTuoResultPanel"></div>
+        `;
+        document.getElementById('mainApp').innerHTML = html;
+        
+        function updateTuo() {
+            const danCount = parseInt(document.getElementById('danCountSelect').value);
+            const minTuo = 7 - danCount;
+            const maxTuo = 49 - danCount;
+            let opts = "";
+            for (let i = minTuo; i <= maxTuo; i++) opts += `<option value="${i}">${i} 個拖碼</option>`;
+            document.getElementById('tuoCountSelect').innerHTML = opts;
+            document.getElementById('tuoHint').innerHTML = `最少 ${minTuo} 個，最多 ${maxTuo} 個 (總號碼 ≥ 7)`;
+        }
+        
+        let currentPrice = 10;
+        document.getElementById('danPrice10Btn').classList.add('active');
+        document.getElementById('danPrice5Btn').onclick = () => { currentPrice = 5; document.getElementById('danPrice5Btn').classList.add('active'); document.getElementById('danPrice10Btn').classList.remove('active'); };
+        document.getElementById('danPrice10Btn').onclick = () => { currentPrice = 10; document.getElementById('danPrice10Btn').classList.add('active'); document.getElementById('danPrice5Btn').classList.remove('active'); };
+        document.getElementById('danCountSelect').onchange = updateTuo;
+        
+        document.getElementById('generateDanTuoBtn').onclick = () => {
+            const danCount = parseInt(document.getElementById('danCountSelect').value);
+            const tuoCount = parseInt(document.getElementById('tuoCountSelect').value);
+            const danNumbers = getTopNumbers(rawData, danCount);
+            const tuoNumbers = getTopNumbers(rawData, tuoCount, danNumbers);
+            const needFromTuo = 6 - danCount;
+            const comboCount = combination(tuoCount, needFromTuo);
+            const totalAmount = comboCount * currentPrice;
+            const code = savePrediction('dantuo', { danCount, tuoCount, price: currentPrice }, { dan: danNumbers, tuo: tuoNumbers });
+            
+            let danHtml = `<div class="combo-info" style="background:#fef9c3;"><strong>🎯 膽碼 (必中)</strong><br>`;
+            danNumbers.forEach(n => danHtml += `<span class="number-badge" style="background:#f97316;">${n}</span>`);
+            danHtml += `</div><div class="combo-info"><strong>📌 拖碼 (搭配)</strong><br>`;
+            tuoNumbers.forEach(n => danHtml += `<span class="number-badge">${n}</span>`);
+            danHtml += `</div><div class="combo-info">C(${tuoCount},${needFromTuo}) = ${comboCount.toLocaleString()} 注<br><strong>總金額：$${totalAmount.toLocaleString()}</strong></div>`;
+            danHtml += `<div class="code-box"><div>📌 您的核對碼</div><div class="code">${code}</div><div style="font-size:0.8rem;">💡 開獎後到「核對中獎」輸入此碼</div></div>`;
+            document.getElementById('danTuoResultPanel').innerHTML = danHtml;
+            document.getElementById('danTuoResultPanel').classList.remove('hidden');
+        };
+        updateTuo();
+    }
+
+      // ========== 核對模式 (只保留最近3個月記錄) ==========
+    async function renderCheck() {
+        loadCheckRecords();
+        
+        // 自動清理超過 3 個月的記錄 (90天)
+        const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        let cleanedCount = 0;
+        for (let code in checkRecords) {
+            const timestamp = new Date(checkRecords[code].timestamp).getTime();
+            if (now - timestamp > THREE_MONTHS_MS) {
+                delete checkRecords[code];
+                cleanedCount++;
+            }
+        }
+        if (cleanedCount > 0) {
+            saveCheckRecords();
+            console.log(`已清理 ${cleanedCount} 筆超過3個月的核對記錄`);
+        }
+        
+        // 顯示目前的記錄（只顯示90天內）
+        let historyHtml = '';
+        const list = Object.entries(checkRecords).reverse();
+        if (list.length === 0) {
+            historyHtml = '<div style="text-align:center; color:#666;">📭 暫無核對記錄（系統只保留最近3個月）</div>';
+        } else {
+            for (let [code, rec] of list) {
+                const timestamp = new Date(rec.timestamp).getTime();
+                const daysOld = Math.floor((now - timestamp) / (24*60*60*1000));
+                const daysLeft = 90 - daysOld;
+                
+                let modeName = rec.mode === 'single' ? '單式' : (rec.mode === 'replica' ? '複式' : '膽拖');
+                let details = rec.mode === 'single' ? `${rec.params.betCount}注` : (rec.mode === 'replica' ? `${rec.params.count}碼` : `${rec.params.danCount}膽+${rec.params.tuoCount}拖`);
+                
+                historyHtml += `<div class="history-item">
+                    <strong>🔑 ${code}</strong> - ${modeName} (${details})<br>
+                    <span style="font-size:0.75rem;">📅 ${formatDate(rec.timestamp)} · 剩餘 ${daysLeft} 天</span>
+                    ${rec.checked ? '<span style="float:right; color:#10b981;">✅ 已核對</span>' : ''}
+                </div>`;
+            }
+        }
+        
+        // 顯示保留期限說明
+        const infoHtml = `<div style="background:#eef2ff; border-radius:1rem; padding:0.8rem; margin-bottom:1rem; text-align:center; font-size:0.8rem;">
+            ⏰ 系統只保留 <strong>最近3個月</strong> 的生成記錄，超過90天會自動清除。
+        </div>`;
+        
+        const html = `
+            <div class="card">
+                <div><strong>🔍 輸入核對碼與開獎號碼</strong></div>
+                <div class="bet-selector"><label>📌 核對碼：</label><input type="text" id="checkCode" placeholder="例如 A3B9X7" style="padding:10px; width:150px; text-align:center;"></div>
+                <div class="bet-selector"><label>🎲 開獎號碼 (6個)：</label><input type="text" id="drawNumbers" placeholder="5,18,22,31,44,48" style="width:100%; padding:10px;"></div>
+                <button id="doCheckBtn">🔍 核對中獎</button>
+                <div id="checkResult"></div>
+            </div>
+            <div class="card">
+                <strong>📋 您的核對記錄 (最近3個月)</strong>
+                ${infoHtml}
+                <div style="max-height:300px; overflow-y:auto; margin-top:10px;">${historyHtml}</div>
+            </div>
+        `;
+        document.getElementById('mainApp').innerHTML = html;
+        
+        document.getElementById('doCheckBtn').onclick = () => {
+            const code = document.getElementById('checkCode').value.trim().toUpperCase();
+            const drawInput = document.getElementById('drawNumbers').value.trim();
+            if (!code) { alert('請輸入核對碼'); return; }
+            if (!drawInput) { alert('請輸入開獎號碼'); return; }
+            const drawNumbers = drawInput.split(',').map(n => parseInt(n.trim(), 10));
+            if (drawNumbers.length !== 6 || drawNumbers.some(isNaN)) {
+                alert('請輸入6個號碼，用逗號分隔');
+                return;
+            }
+            
+            const record = checkRecords[code];
+            if (!record) {
+                document.getElementById('checkResult').innerHTML = `<div class="error-box">❌ 核對碼無效<br><span style="font-size:0.8rem;">可能原因：核對碼錯誤、記錄已超過3個月被清除</span></div>`;
+                return;
+            }
+            
+            // 再次檢查是否過期
+            const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+            const timestamp = new Date(record.timestamp).getTime();
+            if (now - timestamp > THREE_MONTHS_MS) {
+                // 如果過期，刪除並提示
+                delete checkRecords[code];
+                saveCheckRecords();
+                document.getElementById('checkResult').innerHTML = `<div class="error-box">❌ 此核對碼記錄已超過3個月，已被系統自動清除，無法核對</div>`;
+                setTimeout(() => renderCheck(), 1500);
+                return;
+            }
+            
+            let hitCount = 0, total = 0;
+            if (record.mode === 'single') {
+                total = record.data.length * 6;
+                for (let ticket of record.data) {
+                    hitCount += ticket.filter(n => drawNumbers.includes(n)).length;
+                }
+            } else if (record.mode === 'replica') {
+                total = record.data.length;
+                hitCount = record.data.filter(n => drawNumbers.includes(n)).length;
+            } else {
+                total = record.data.dan.length + record.data.tuo.length;
+                hitCount = record.data.dan.filter(n => drawNumbers.includes(n)).length;
+                hitCount += record.data.tuo.filter(n => drawNumbers.includes(n)).length;
+            }
+            
+            const avg = (hitCount / total * 6).toFixed(2);
+            let prize = '';
+            if (record.mode === 'replica') {
+                const matchCount = record.data.filter(n => drawNumbers.includes(n)).length;
+                if (matchCount >= 6) prize = '🏆 恭喜中頭獎！';
+                else if (matchCount === 5) prize = '🎉 中 $20,000';
+                else if (matchCount === 4) prize = '🎉 中 $1,000';
+                else if (matchCount === 3) prize = '🎉 中 $40';
+                else prize = '❌ 未中獎';
+            } else {
+                prize = `命中率 ${avg} / 6`;
+                if (avg >= 3) prize += ' 🎉';
+            }
+            
+            record.checked = true;
+            saveCheckRecords();
+            document.getElementById('checkResult').innerHTML = `<div class="code-box" style="background:#d1fae5;"><div>🎯 核對結果</div><div>命中 ${hitCount} / ${total} 個號碼</div><div>${prize}</div></div>`;
+            setTimeout(() => renderCheck(), 1000);
+        };
+    }
+    
+    // ========== 模式切換 ==========
+    function switchMode(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.mode-tab').forEach((tab, idx) => {
+            const modes = ['single', 'replica', 'danTuo', 'check'];
+            tab.classList.toggle('active', modes[idx] === mode);
+        });
+        if (mode === 'single') renderSingle();
+        else if (mode === 'replica') renderReplica();
+        else if (mode === 'danTuo') renderDanTuo();
+        else renderCheck();
+    }
+    
+    // ========== 初始化 ==========
+    async function init() {
+        document.getElementById('mainApp').innerHTML = `<div class="card loading">📡 從 Google Sheets 讀取 ${CSV_URL}<br>⏳ 請稍候...</div>`;
+        const records = await loadCsvData();
+        if (!records || records.length === 0) {
+            document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 讀取失敗，請確認 Google Sheets 已設為「知道連結的人可檢視」<br><br>🔗 目前使用的連結：<br><code style="font-size:0.7rem; word-break:break-all;">${CSV_URL}</code></div>`;
+            return;
+        }
+        rawData = records;
+        console.log("數據載入成功，共", rawData.length, "期");
+        
+        // 綁定事件
+        document.getElementById('singleModeTab').onclick = () => switchMode('single');
+        document.getElementById('replicaModeTab').onclick = () => switchMode('replica');
+        document.getElementById('danTuoModeTab').onclick = () => switchMode('danTuo');
+        document.getElementById('checkModeTab').onclick = () => switchMode('check');
+        
+        loadCheckRecords();
+        renderSingle();
+    }
+    
+    init();
+</script>
+</body>
+</html>
