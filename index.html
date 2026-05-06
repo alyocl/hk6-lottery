@@ -756,9 +756,9 @@ async function renderCheck() {
     </div>`;
     const html = `
         <div class="card">
-            <div><strong>🔍 輸入核對碼與開獎號碼</strong></div>
+            <div><strong>🔍 輸入核對碼與攪出號碼</strong></div>
             <div class="bet-selector"><label>📌 核對碼：</label><input type="text" id="checkCode" placeholder="例如 A3B9X7" style="padding:10px; width:150px; text-align:center;"></div>
-            <div class="bet-selector"><label>🎲 開獎正碼 (6個)：</label><input type="text" id="drawNumbers" placeholder="5,18,22,31,44,48" style="width:100%; padding:10px;"></div>
+            <div class="bet-selector"><label>🎲 攪出號碼 (6個)：</label><input type="text" id="drawNumbers" placeholder="5,18,22,31,44,48" style="width:100%; padding:10px;"></div>
             <div class="bet-selector"><label>⭐ 特別號 (1個)：</label><input type="text" id="specialNumber" placeholder="例如 9" style="width:100%; padding:10px;"></div>
             <button id="doCheckBtn">🔍 核對中獎</button>
             <div id="checkResult"></div>
@@ -776,11 +776,11 @@ async function renderCheck() {
         const drawInput = document.getElementById('drawNumbers').value.trim();
         const specialInput = document.getElementById('specialNumber').value.trim();
         if (!code) { alert('請輸入核對碼'); return; }
-        if (!drawInput) { alert('請輸入開獎正碼'); return; }
+        if (!drawInput) { alert('請輸入攪出號碼'); return; }
         if (!specialInput) { alert('請輸入特別號'); return; }
         const drawNumbers = drawInput.split(',').map(n => parseInt(n.trim(), 10));
         const specialNumber = parseInt(specialInput, 10);
-        if (drawNumbers.length !== 6 || drawNumbers.some(isNaN)) { alert('請輸入6個正碼，用逗號分隔'); return; }
+        if (drawNumbers.length !== 6 || drawNumbers.some(isNaN)) { alert('請輸入6個攪出號碼，用逗號分隔'); return; }
         if (isNaN(specialNumber) || specialNumber < 1 || specialNumber > 49) { alert('請輸入1-49之間的特別號'); return; }
 
         const record = checkRecords[code];
