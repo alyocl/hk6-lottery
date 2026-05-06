@@ -844,6 +844,7 @@ if (record.mode === 'single') {
     if (!anyPrize) {
         resultHtml += `<div>❌ 未中獎</div>`;
     }
+}
     else if (record.mode === 'replica') {
         // 複式：合併顯示
         const recommendedNumbers = record.data.slice();
