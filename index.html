@@ -804,34 +804,46 @@ async function renderCheck() {
     resultHtml += `<div>🎯 核對結果</div>`;
 
     // 依玩法處理命中號碼的顯示（單式分注、其他合併）
-    if (record.mode === 'single') {
-        // 單式：逐注顯示命中號碼
-        let totalHitCount = 0;
-        for (let i = 0; i < record.data.length; i++) {
-            const ticket = record.data[i];
-            const hitNumbers = ticket.filter(n => drawNumbers.includes(n));
-            totalHitCount += hitNumbers.length;
-            if (hitNumbers.length > 0) {
-                resultHtml += `<div>📌 注 ${i+1}：中獎號碼 ${hitNumbers.join(', ')}</div>`;
-            } else {
-                resultHtml += `<div>📌 注 ${i+1}：中獎號碼 無</div>`;
-            }
+if (record.mode === 'single') {
+    let anyPrize = false;
+    const hasSpecialMatch = (record.special === specialNumber);
+    for (let i = 0; i < record.data.length; i++) {
+        const ticket = record.data[i];
+        const hitNumbers = ticket.filter(n => drawNumbers.includes(n));
+        const hitCount = hitNumbers.length;
+        let prizeText = '';
+        // 根据正码命中数和特别号是否正确来判断奖项
+        if (hitCount === 6) {
+            prizeText = '🏆 頭獎';
+            anyPrize = true;
+        } else if (hitCount === 5 && hasSpecialMatch) {
+            prizeText = '🎉 二獎';
+            anyPrize = true;
+        } else if (hitCount === 5) {
+            prizeText = '🎉 三獎';
+            anyPrize = true;
+        } else if (hitCount === 4 && hasSpecialMatch) {
+            prizeText = '🎉 四獎 ($9,600)';
+            anyPrize = true;
+        } else if (hitCount === 4) {
+            prizeText = '🎉 五獎 ($640)';
+            anyPrize = true;
+        } else if (hitCount === 3 && hasSpecialMatch) {
+            prizeText = '🎉 六獎 ($320)';
+            anyPrize = true;
+        } else if (hitCount === 3) {
+            prizeText = '🎉 七獎 ($40)';
+            anyPrize = true;
+        } else {
+            prizeText = '未中獎';
         }
-        // 特別號
-        const hasSpecialMatch = (record.special === specialNumber);
-        resultHtml += `<div>特別號：${hasSpecialMatch ? '✅ 中' : '❌ 不中'}</div>`;
-        // 獎項判斷（使用總中獎正碼數作為簡易判斷，若需更精確可改用最佳注，此處沿用原始邏輯）
-        const mainHit = totalHitCount;
-        const hasSpecial = hasSpecialMatch;
-        if (mainHit === 6) resultHtml += `<div>🏆 恭喜中頭獎！</div>`;
-        else if (mainHit === 5 && hasSpecial) resultHtml += `<div>🎉 中二獎</div>`;
-        else if (mainHit === 5) resultHtml += `<div>🎉 中三獎</div>`;
-        else if (mainHit === 4 && hasSpecial) resultHtml += `<div>🎉 中四獎 ($9,600)</div>`;
-        else if (mainHit === 4) resultHtml += `<div>🎉 中五獎 ($640)</div>`;
-        else if (mainHit === 3 && hasSpecial) resultHtml += `<div>🎉 中六獎 ($320)</div>`;
-        else if (mainHit === 3) resultHtml += `<div>🎉 中七獎 ($40)</div>`;
-        else resultHtml += `<div>❌ 未中獎</div>`;
-    } 
+        const hitDisplay = hitNumbers.length ? hitNumbers.join(', ') : '無';
+        // 显示该注的中奖号码和奖项（特别号已融入奖项判断）
+        resultHtml += `<div>📌 注 ${i+1}：中獎號碼 ${hitDisplay} → ${prizeText}</div>`;
+    }
+    if (!anyPrize) {
+        resultHtml += `<div>❌ 未中獎</div>`;
+    }
     else if (record.mode === 'replica') {
         // 複式：合併顯示
         const recommendedNumbers = record.data.slice();
