@@ -828,7 +828,7 @@ async function renderCheck() {
         record.checked = true;
         saveCheckRecords();
         document.getElementById('checkResult').innerHTML = `<div class="code-box" style="background:#d1fae5;"><div>🎯 核對結果</div><div>命中 ${hitCount} / ${total} 個號碼</div><div>${prize}</div></div>`;
-        setTimeout(() => renderCheck(), 1000);
+        // setTimeout(() => renderCheck(), 1000);
     };
 }
 
