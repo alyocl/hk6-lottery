@@ -529,7 +529,6 @@ function predictTicketsFixed(dataSeries, nTickets) {
     return tickets;
 }
 
-// ==================== 各模式的渲染函數 ====================
 async function renderSingle() {
     if (!rawData || rawData.length === 0) {
         document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 數據載入失敗，請檢查 Google Sheets 是否公開</div>`;
@@ -566,10 +565,8 @@ async function renderSingle() {
         <button id="predictBtn">🔮 開始預測</button>
     `;
     document.getElementById('mainApp').innerHTML = html;
-    
-    // ... 其餘程式碼不變
-}
-    
+
+    // ▼ 事件綁定必須放在這裡（函數內部）
     document.getElementById('predictBtn').onclick = () => {
         const betVal = parseInt(document.getElementById('betSelect').value);
         const tickets = predictTicketsFixed(rawData, betVal);
@@ -590,7 +587,7 @@ async function renderSingle() {
         }
         document.getElementById('resultPanel').innerHTML = resultHtml;
     };
-}
+}   // ← 函數在這裡正確結束，只有一個 }
 
 async function renderReplica() {
     if (!rawData || rawData.length === 0) {
