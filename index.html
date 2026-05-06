@@ -538,10 +538,31 @@
         `;
         document.getElementById('mainApp').innerHTML = html;
         
+                let lastTicketsKey = '';
+        
         document.getElementById('predictBtn').onclick = () => {
             const betVal = parseInt(document.getElementById('betSelect').value);
             const tickets = predictTicketsFixed(rawData, betVal);
-            const code = savePrediction('single', { betCount: betVal }, tickets);
+            
+            // 生成當前推薦的唯一標識
+            const currentKey = JSON.stringify(tickets);
+            
+            let code;
+            if (lastTicketsKey === currentKey) {
+                // 如果推薦相同，從 storage 中找到對應的核對碼
+                const existingCode = Object.keys(checkRecords).find(key => {
+                    const record = checkRecords[key];
+                    return record.mode === 'single' && 
+                           record.params.betCount === betVal &&
+                           JSON.stringify(record.data) === currentKey;
+                });
+                code = existingCode || savePrediction('single', { betCount: betVal }, tickets);
+            } else {
+                // 推薦不同，產生新核對碼
+                code = savePrediction('single', { betCount: betVal }, tickets);
+                lastTicketsKey = currentKey;
+            }
+            
             let resultHtml = `<div><strong>🎯 推薦 ${betVal} 注</strong></div>`;
             tickets.forEach((t,i) => resultHtml += `<div class="ticket-row">注 ${i+1}： ${t.join(', ')}</div>`);
             resultHtml += `<div class="code-box"><div>📌 您的核對碼</div><div class="code">${code}</div><div style="font-size:0.8rem;">💡 開獎後到「核對中獎」輸入此碼</div></div>`;
