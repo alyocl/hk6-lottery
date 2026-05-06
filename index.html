@@ -405,6 +405,12 @@
             if (records.length === 0) throw new Error("沒有有效號碼");
             console.log("成功載入", records.length, "期數據");
             
+            // 只保留最新 180 期
+            if (records.length > 180) {
+                records = records.slice(0, 180);
+                console.log("已限制為最新 180 期數據");
+            }
+            
             // 更新當前期數
             currentIssueKey = getIssueKey(records);
             console.log("當前期數標識:", currentIssueKey);
