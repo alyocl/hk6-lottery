@@ -355,30 +355,30 @@
     }
 
     function savePrediction(mode, params, data) {
-    // 檢查是否已有相同期數、相同參數的記錄
-    const existingEntry = Object.entries(checkRecords).find(([key, record]) => {
-        return record.mode === mode && 
-               record.issue === currentIssueKey &&
-               JSON.stringify(record.params) === JSON.stringify(params);
-    });
-    
-    if (existingEntry) {
-        const [existingCode, existingRecord] = existingEntry;
-        return { code: existingCode, isNew: false };
+        // 檢查是否已有相同期數、相同參數的記錄
+        const existingEntry = Object.entries(checkRecords).find(([key, record]) => {
+            return record.mode === mode && 
+                   record.issue === currentIssueKey &&
+                   JSON.stringify(record.params) === JSON.stringify(params);
+        });
+        
+        if (existingEntry) {
+            const [existingCode, existingRecord] = existingEntry;
+            return { code: existingCode, isNew: false };
+        }
+        
+        const code = generateCheckCode();
+        checkRecords[code] = {
+            mode: mode,
+            params: params,
+            data: data,
+            issue: currentIssueKey,
+            timestamp: new Date().toISOString(),
+            checked: false
+        };
+        saveCheckRecords();
+        return { code: code, isNew: true };
     }
-    
-    const code = generateCheckCode();
-    checkRecords[code] = {
-        mode: mode,
-        params: params,
-        data: data,
-        issue: currentIssueKey,
-        timestamp: new Date().toISOString(),
-        checked: false
-    };
-    saveCheckRecords();
-    return { code: code, isNew: true };
-}
 
     async function loadCsvData() {
         try {
@@ -529,6 +529,7 @@
         return tickets;
     }
     
+    // ========== 單式模式 ==========
     async function renderSingle() {
         if (!rawData || rawData.length === 0) {
             document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 數據載入失敗，請檢查 Google Sheets 是否公開</div>`;
@@ -565,32 +566,33 @@
         `;
         document.getElementById('mainApp').innerHTML = html;
         
-    document.getElementById('predictBtn').onclick = () => {
-    const betVal = parseInt(document.getElementById('betSelect').value);
-    const tickets = predictTicketsFixed(rawData, betVal);
-    const result = savePrediction('single', { betCount: betVal }, tickets);
-    
-    let alertHtml = '';
-    if (!result.isNew) {
-        alertHtml = `<div class="code-box" style="background:#fef3c7; border-color:#f97316;">
-                        ⚠️ 本期已推薦過相同玩法<br>
-                        📌 核對碼：<span class="code" style="font-size:1.2rem;">${result.code}</span>
-                    </div>`;
+        document.getElementById('predictBtn').onclick = () => {
+            const betVal = parseInt(document.getElementById('betSelect').value);
+            const tickets = predictTicketsFixed(rawData, betVal);
+            const result = savePrediction('single', { betCount: betVal }, tickets);
+            
+            let alertHtml = '';
+            if (!result.isNew) {
+                alertHtml = `<div class="code-box" style="background:#fef3c7; border-color:#f97316;">
+                                ⚠️ 本期已推薦過相同玩法<br>
+                                📌 核對碼：<span class="code" style="font-size:1.2rem;">${result.code}</span>
+                            </div>`;
+            }
+            
+            let resultHtml = `<div><strong>🎯 推薦 ${betVal} 注</strong></div>`;
+            tickets.forEach((t,i) => resultHtml += `<div class="ticket-row">注 ${i+1}： ${t.join(', ')}</div>`);
+            
+            if (result.isNew) {
+                resultHtml += `<div class="code-box"><div>📌 您的核對碼</div><div class="code">${result.code}</div><div style="font-size:0.8rem;">💡 開獎後到「核對中獎」輸入此碼</div></div>`;
+            } else {
+                resultHtml += alertHtml;
+            }
+            
+            document.getElementById('resultPanel').innerHTML = resultHtml;
+        };
     }
     
-    let resultHtml = `<div><strong>🎯 推薦 ${betVal} 注</strong></div>`;
-    tickets.forEach((t,i) => resultHtml += `<div class="ticket-row">注 ${i+1}： ${t.join(', ')}</div>`);
-    
-    if (result.isNew) {
-        resultHtml += `<div class="code-box"><div>📌 您的核對碼</div><div class="code">${result.code}</div><div style="font-size:0.8rem;">💡 開獎後到「核對中獎」輸入此碼</div></div>`;
-    } else {
-        resultHtml += alertHtml;
-    }
-    
-    document.getElementById('resultPanel').innerHTML = resultHtml;
-};
-    }
-    
+    // ========== 複式模式 ==========
     async function renderReplica() {
         if (!rawData || rawData.length === 0) {
             document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 數據載入失敗</div>`;
@@ -625,17 +627,32 @@
             const topNumbers = getTopNumbers(rawData, count);
             const comboCount = combination(count, 6);
             const totalAmount = comboCount * currentPrice;
-            const code = savePrediction('replica', { count, price: currentPrice }, topNumbers);
+            const result = savePrediction('replica', { count, price: currentPrice }, topNumbers);
+            
+            let alertHtml = '';
+            if (!result.isNew) {
+                alertHtml = `<div class="code-box" style="background:#fef3c7; border-color:#f97316;">
+                                ⚠️ 本期已推薦過相同玩法<br>
+                                📌 核對碼：<span class="code" style="font-size:1.2rem;">${result.code}</span>
+                            </div>`;
+            }
             
             let numbersHtml = `<div class="combo-info"><strong>🎲 推薦 ${count} 個號碼</strong><br>`;
             topNumbers.forEach(n => numbersHtml += `<span class="number-badge">${n}</span>`);
             numbersHtml += `</div><div class="combo-info">C(${count},6) = ${comboCount.toLocaleString()} 注<br><strong>總金額：$${totalAmount.toLocaleString()}</strong></div>`;
-            numbersHtml += `<div class="code-box"><div>📌 您的核對碼</div><div class="code">${code}</div><div style="font-size:0.8rem;">💡 同一期內相同玩法不會重複生成新碼</div></div>`;
+            
+            if (result.isNew) {
+                numbersHtml += `<div class="code-box"><div>📌 您的核對碼</div><div class="code">${result.code}</div><div style="font-size:0.8rem;">💡 開獎後到「核對中獎」輸入此碼</div></div>`;
+            } else {
+                numbersHtml += alertHtml;
+            }
+            
             document.getElementById('replicaResultPanel').innerHTML = numbersHtml;
             document.getElementById('replicaResultPanel').classList.remove('hidden');
         };
     }
 
+    // ========== 膽拖模式 ==========
     async function renderDanTuo() {
         if (!rawData || rawData.length === 0) {
             document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 數據載入失敗</div>`;
@@ -685,20 +702,35 @@
             const needFromTuo = 6 - danCount;
             const comboCount = combination(tuoCount, needFromTuo);
             const totalAmount = comboCount * currentPrice;
-            const code = savePrediction('dantuo', { danCount, tuoCount, price: currentPrice }, { dan: danNumbers, tuo: tuoNumbers });
+            const result = savePrediction('dantuo', { danCount, tuoCount, price: currentPrice }, { dan: danNumbers, tuo: tuoNumbers });
+            
+            let alertHtml = '';
+            if (!result.isNew) {
+                alertHtml = `<div class="code-box" style="background:#fef3c7; border-color:#f97316;">
+                                ⚠️ 本期已推薦過相同玩法<br>
+                                📌 核對碼：<span class="code" style="font-size:1.2rem;">${result.code}</span>
+                            </div>`;
+            }
             
             let danHtml = `<div class="combo-info" style="background:#fef9c3;"><strong>🎯 膽碼 (必中)</strong><br>`;
             danNumbers.forEach(n => danHtml += `<span class="number-badge" style="background:#f97316;">${n}</span>`);
             danHtml += `</div><div class="combo-info"><strong>📌 拖碼 (搭配)</strong><br>`;
             tuoNumbers.forEach(n => danHtml += `<span class="number-badge">${n}</span>`);
             danHtml += `</div><div class="combo-info">C(${tuoCount},${needFromTuo}) = ${comboCount.toLocaleString()} 注<br><strong>總金額：$${totalAmount.toLocaleString()}</strong></div>`;
-            danHtml += `<div class="code-box"><div>📌 您的核對碼</div><div class="code">${code}</div><div style="font-size:0.8rem;">💡 同一期內相同玩法不會重複生成新碼</div></div>`;
+            
+            if (result.isNew) {
+                danHtml += `<div class="code-box"><div>📌 您的核對碼</div><div class="code">${result.code}</div><div style="font-size:0.8rem;">💡 開獎後到「核對中獎」輸入此碼</div></div>`;
+            } else {
+                danHtml += alertHtml;
+            }
+            
             document.getElementById('danTuoResultPanel').innerHTML = danHtml;
             document.getElementById('danTuoResultPanel').classList.remove('hidden');
         };
         updateTuo();
     }
 
+    // ========== 核對中獎模式 ==========
     async function renderCheck() {
         loadCheckRecords();
         
@@ -773,4 +805,105 @@
                 alert('請輸入6個正碼，用逗號分隔');
                 return;
             }
-            if (isNaN(special
+            if (isNaN(specialNumber) || specialNumber < 1 || specialNumber > 49) {
+                alert('請輸入1-49之間的特別號');
+                return;
+            }
+            
+            const record = checkRecords[code];
+            if (!record) {
+                document.getElementById('checkResult').innerHTML = `<div class="error-box">❌ 核對碼無效<br><span style="font-size:0.8rem;">可能原因：核對碼錯誤、記錄已超過3個月被清除</span></div>`;
+                return;
+            }
+            
+            // 檢查是否過期
+            const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+            const timestamp = new Date(record.timestamp).getTime();
+            if (now - timestamp > THREE_MONTHS_MS) {
+                delete checkRecords[code];
+                saveCheckRecords();
+                document.getElementById('checkResult').innerHTML = `<div class="error-box">❌ 此核對碼記錄已超過3個月，已被系統自動清除，無法核對</div>`;
+                setTimeout(() => renderCheck(), 1500);
+                return;
+            }
+            
+            let hitCount = 0, total = 0;
+            if (record.mode === 'single') {
+                total = record.data.length * 6;
+                for (let ticket of record.data) {
+                    hitCount += ticket.filter(n => drawNumbers.includes(n)).length;
+                }
+            } else if (record.mode === 'replica') {
+                total = record.data.length;
+                hitCount = record.data.filter(n => drawNumbers.includes(n)).length;
+            } else {
+                total = record.data.dan.length + record.data.tuo.length;
+                hitCount = record.data.dan.filter(n => drawNumbers.includes(n)).length;
+                hitCount += record.data.tuo.filter(n => drawNumbers.includes(n)).length;
+            }
+            
+            let prize = '';
+            if (record.mode === 'replica') {
+                const matchCount = record.data.filter(n => drawNumbers.includes(n)).length;
+                if (matchCount === 6) prize = '🏆 恭喜中頭獎！';
+                else if (matchCount === 5) prize = '🎉 中三獎';
+                else if (matchCount === 4) prize = '🎉 中五獎 ($640)';
+                else if (matchCount === 3) prize = '🎉 中七獎 ($40)';
+                else prize = '❌ 未中獎';
+            } else {
+                const mainMatchCount = record.data.filter(n => drawNumbers.includes(n)).length;
+                const hasSpecialMatch = record.special === specialNumber ? 1 : 0;
+                
+                if (mainMatchCount === 6) prize = '🏆 恭喜中頭獎！';
+                else if (mainMatchCount === 5 && hasSpecialMatch) prize = '🎉 中二獎';
+                else if (mainMatchCount === 5) prize = '🎉 中三獎';
+                else if (mainMatchCount === 4 && hasSpecialMatch) prize = '🎉 中四獎 ($9,600)';
+                else if (mainMatchCount === 4) prize = '🎉 中五獎 ($640)';
+                else if (mainMatchCount === 3 && hasSpecialMatch) prize = '🎉 中六獎 ($320)';
+                else if (mainMatchCount === 3) prize = '🎉 中七獎 ($40)';
+                else prize = '❌ 未中獎';
+            }
+            
+            record.checked = true;
+            saveCheckRecords();
+            document.getElementById('checkResult').innerHTML = `<div class="code-box" style="background:#d1fae5;"><div>🎯 核對結果</div><div>命中 ${hitCount} / ${total} 個號碼</div><div>${prize}</div></div>`;
+            setTimeout(() => renderCheck(), 1000);
+        };
+    }
+    
+    function switchMode(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.mode-tab').forEach((tab, idx) => {
+            const modes = ['single', 'replica', 'danTuo', 'check'];
+            tab.classList.toggle('active', modes[idx] === mode);
+        });
+        if (mode === 'single') renderSingle();
+        else if (mode === 'replica') renderReplica();
+        else if (mode === 'danTuo') renderDanTuo();
+        else renderCheck();
+    }
+    
+    async function init() {
+        document.getElementById('mainApp').innerHTML = `<div class="card loading">📡 正在載入最新開獎數據...</div>`;
+        const records = await loadCsvData();
+        if (!records || records.length === 0) {
+            document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 讀取失敗，請確認 Google Sheets 已設為「知道連結的人可檢視」</div>`;
+            return;
+        }
+        rawData = records;
+        console.log("數據載入成功，共", rawData.length, "期");
+        
+        document.getElementById('singleModeTab').onclick = () => switchMode('single');
+        document.getElementById('replicaModeTab').onclick = () => switchMode('replica');
+        document.getElementById('danTuoModeTab').onclick = () => switchMode('danTuo');
+        document.getElementById('checkModeTab').onclick = () => switchMode('check');
+        
+        loadCheckRecords();
+        renderSingle();
+    }
+    
+    init();
+</script>
+</body>
+</html>
