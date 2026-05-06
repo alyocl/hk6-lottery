@@ -357,6 +357,15 @@ function getIssueKey(dataSeries) {
     return `${latest.n1},${latest.n2},${latest.n3},${latest.n4},${latest.n5},${latest.n6}|${latest.special}`;
 }
 
+// 新增這裡
+function getIssueNumber(index) {
+    let num = 47 - index;
+    if (num >= 1) {
+        return `26/${num.toString().padStart(3, '0')}`;
+    } else {
+        return `期數_${index + 1}`;
+    }
+}
 function savePrediction(mode, params, data) {
     const existingEntry = Object.entries(checkRecords).find(([key, record]) => {
         return record.mode === mode && 
