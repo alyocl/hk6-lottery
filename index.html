@@ -532,20 +532,23 @@ function predictTicketsFixed(dataSeries, nTickets) {
 // ==================== 各模式的渲染函數 ====================
 async function renderSingle() {
     if (!rawData || rawData.length === 0) {
-        document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 數據載入失敗，請確認試算表已公開且 API 金鑰正確</div>`;
+        document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 數據載入失敗，請檢查 Google Sheets 是否公開</div>`;
         return;
     }
     const latest = rawData[0];
     const total = rawData.length;
+    
     let recentHtml = '';
     for (let i=0; i<Math.min(5, rawData.length); i++) {
         const r = rawData[i];
-        recentHtml += `<div class="recent-item"><strong>${i===0?'最新':`${i+1}`}</strong> ${r.n1},${r.n2},${r.n3},${r.n4},${r.n5},${r.n6}</div>`;
+        const issueNum = getIssueNumber(i);
+        recentHtml += `<div class="recent-item"><strong>${issueNum}</strong> ${r.n1},${r.n2},${r.n3},${r.n4},${r.n5},${r.n6}</div>`;
     }
+    
     const html = `
         <div class="card">
             <div class="latest-box">
-                <strong>✨ 最新一期</strong><br>
+                <strong>✨ 最新一期 ${getIssueNumber(0)}</strong><br>
                 <span style="font-size:1.4rem; font-weight:800;">${latest.n1}  ${latest.n2}  ${latest.n3}  ${latest.n4}  ${latest.n5}  ${latest.n6}</span>
                 <span class="special-number">特 ${latest.special}</span>
             </div>
@@ -563,6 +566,10 @@ async function renderSingle() {
         <button id="predictBtn">🔮 開始預測</button>
     `;
     document.getElementById('mainApp').innerHTML = html;
+    
+    // ... 其餘程式碼不變
+}
+    
     document.getElementById('predictBtn').onclick = () => {
         const betVal = parseInt(document.getElementById('betSelect').value);
         const tickets = predictTicketsFixed(rawData, betVal);
