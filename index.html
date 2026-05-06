@@ -719,6 +719,7 @@ async function renderDanTuo() {
 
 async function renderCheck() {
     loadCheckRecords();
+    // 清理超過3個月的舊記錄
     const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
     const now = Date.now();
     let cleanedCount = 0;
@@ -730,6 +731,8 @@ async function renderCheck() {
         }
     }
     if (cleanedCount > 0) saveCheckRecords();
+
+    // 建立歷史記錄列表（仍顯示，若要隱藏可刪除）
     let historyHtml = '';
     const list = Object.entries(checkRecords).reverse();
     if (list.length === 0) {
@@ -767,6 +770,7 @@ async function renderCheck() {
         </div>
     `;
     document.getElementById('mainApp').innerHTML = html;
+
     document.getElementById('doCheckBtn').onclick = () => {
         const code = document.getElementById('checkCode').value.trim().toUpperCase();
         const drawInput = document.getElementById('drawNumbers').value.trim();
@@ -778,11 +782,13 @@ async function renderCheck() {
         const specialNumber = parseInt(specialInput, 10);
         if (drawNumbers.length !== 6 || drawNumbers.some(isNaN)) { alert('請輸入6個正碼，用逗號分隔'); return; }
         if (isNaN(specialNumber) || specialNumber < 1 || specialNumber > 49) { alert('請輸入1-49之間的特別號'); return; }
+
         const record = checkRecords[code];
         if (!record) {
             document.getElementById('checkResult').innerHTML = `<div class="error-box">❌ 核對碼無效<br><span style="font-size:0.8rem;">可能原因：核對碼錯誤、記錄已超過3個月被清除</span></div>`;
             return;
         }
+        // 檢查是否過期
         const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
         const now = Date.now();
         const timestamp = new Date(record.timestamp).getTime();
@@ -793,42 +799,59 @@ async function renderCheck() {
             setTimeout(() => renderCheck(), 1500);
             return;
         }
-        let hitCount = 0, total = 0;
+
+        // 依玩法類型，取出所有推薦號碼（展開）
+        let recommendedNumbers = [];
         if (record.mode === 'single') {
-            total = record.data.length * 6;
-            for (let ticket of record.data) hitCount += ticket.filter(n => drawNumbers.includes(n)).length;
+            for (let ticket of record.data) {
+                recommendedNumbers.push(...ticket);
+            }
         } else if (record.mode === 'replica') {
-            total = record.data.length;
-            hitCount = record.data.filter(n => drawNumbers.includes(n)).length;
-        } else {
-            total = record.data.dan.length + record.data.tuo.length;
-            hitCount = record.data.dan.filter(n => drawNumbers.includes(n)).length;
-            hitCount += record.data.tuo.filter(n => drawNumbers.includes(n)).length;
+            recommendedNumbers = record.data.slice();
+        } else { // dantuo
+            recommendedNumbers.push(...record.data.dan, ...record.data.tuo);
         }
-        let prize = '';
+
+        // 計算命中的正碼（去重複，只顯示唯一號碼）
+        const hitNumbers = [...new Set(recommendedNumbers.filter(n => drawNumbers.includes(n)))];
+        const hasSpecialMatch = (record.special === specialNumber);
+
+        // 建構結果 HTML
+        let resultHtml = `<div class="code-box" style="background:#d1fae5;">`;
+        resultHtml += `<div>🎯 核對結果</div>`;
+        if (hitNumbers.length > 0) {
+            resultHtml += `<div>中獎號碼：${hitNumbers.join(', ')}</div>`;
+        } else {
+            resultHtml += `<div>中獎號碼：無</div>`;
+        }
+        resultHtml += `<div>特別號：${hasSpecialMatch ? '✅ 中' : '❌ 不中'}</div>`;
+
+        // 獎項判斷（保留原有獎項文字）
         if (record.mode === 'replica') {
-            const matchCount = record.data.filter(n => drawNumbers.includes(n)).length;
-            if (matchCount === 6) prize = '🏆 恭喜中頭獎！';
-            else if (matchCount === 5) prize = '🎉 中三獎';
-            else if (matchCount === 4) prize = '🎉 中五獎 ($640)';
-            else if (matchCount === 3) prize = '🎉 中七獎 ($40)';
-            else prize = '❌ 未中獎';
+            const matchCount = hitNumbers.length;
+            if (matchCount >= 6) resultHtml += `<div>🏆 恭喜中頭獎！</div>`;
+            else if (matchCount === 5) resultHtml += `<div>🎉 中三獎</div>`;
+            else if (matchCount === 4) resultHtml += `<div>🎉 中五獎 ($640)</div>`;
+            else if (matchCount === 3) resultHtml += `<div>🎉 中七獎 ($40)</div>`;
+            else resultHtml += `<div>❌ 未中獎</div>`;
         } else {
-            const mainMatchCount = record.data.filter(n => drawNumbers.includes(n)).length;
-            const hasSpecialMatch = record.special === specialNumber ? 1 : 0;
-            if (mainMatchCount === 6) prize = '🏆 恭喜中頭獎！';
-            else if (mainMatchCount === 5 && hasSpecialMatch) prize = '🎉 中二獎';
-            else if (mainMatchCount === 5) prize = '🎉 中三獎';
-            else if (mainMatchCount === 4 && hasSpecialMatch) prize = '🎉 中四獎 ($9,600)';
-            else if (mainMatchCount === 4) prize = '🎉 中五獎 ($640)';
-            else if (mainMatchCount === 3 && hasSpecialMatch) prize = '🎉 中六獎 ($320)';
-            else if (mainMatchCount === 3) prize = '🎉 中七獎 ($40)';
-            else prize = '❌ 未中獎';
+            const mainHit = hitNumbers.length;
+            const hasSpecial = hasSpecialMatch;
+            if (mainHit === 6) resultHtml += `<div>🏆 恭喜中頭獎！</div>`;
+            else if (mainHit === 5 && hasSpecial) resultHtml += `<div>🎉 中二獎</div>`;
+            else if (mainHit === 5) resultHtml += `<div>🎉 中三獎</div>`;
+            else if (mainHit === 4 && hasSpecial) resultHtml += `<div>🎉 中四獎 ($9,600)</div>`;
+            else if (mainHit === 4) resultHtml += `<div>🎉 中五獎 ($640)</div>`;
+            else if (mainHit === 3 && hasSpecial) resultHtml += `<div>🎉 中六獎 ($320)</div>`;
+            else if (mainHit === 3) resultHtml += `<div>🎉 中七獎 ($40)</div>`;
+            else resultHtml += `<div>❌ 未中獎</div>`;
         }
+        resultHtml += `</div>`;
+
         record.checked = true;
         saveCheckRecords();
-        document.getElementById('checkResult').innerHTML = `<div class="code-box" style="background:#d1fae5;"><div>🎯 核對結果</div><div>命中 ${hitCount} / ${total} 個號碼</div><div>${prize}</div></div>`;
-        // setTimeout(() => renderCheck(), 1000);
+        document.getElementById('checkResult').innerHTML = resultHtml;
+        // 已移除 setTimeout 重新載入，結果會保留，不會閃爍
     };
 }
 
