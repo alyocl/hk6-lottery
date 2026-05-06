@@ -312,8 +312,9 @@
 </div>
 
 <script>
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSL-IDTz-iriRrPZJD82PWxKqmpsIWok3yOy-3KnHXDsjTk0frsGZZ4s42mZLYxiPdgiXTF8OlmVJul/pub?gid=0&single=true&output=csv";
-
+const API_KEY = 'AIzaSyCmpR7qGwgfE3y7XIS-O1_cny_iBsDa7No';
+const SPREADSHEET_ID = '1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw';
+const RANGE = 'sheet1!A:G';   // 工作表名稱改為 sheet1
 const MODEL_CONFIG = {
     lookback: 8,
     decay_lambda: 0.35,
@@ -381,46 +382,72 @@ function loadCheckRecords() {
     }
 
     async function loadCsvData() {
-        try {
-            console.log("正在讀取:", CSV_URL);
-            const response = await fetch(CSV_URL, { cache: "no-store" });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const text = await response.text();
-            console.log("讀取到資料長度:", text.length);
-            
-            const lines = text.trim().split(/\r?\n/);
-            if (lines.length < 2) throw new Error("資料不足");
-            
-            const records = [];
-            for (let i=1; i<lines.length; i++) {
-                const parts = lines[i].split(',').map(v => parseInt(v,10));
-                if (parts.length < 7) continue;
-                if (parts.slice(0,7).every(v => !isNaN(v) && v >= 1 && v <= 49)) {
-                    records.push({
-                        n1: parts[0], n2: parts[1], n3: parts[2],
-                        n4: parts[3], n5: parts[4], n6: parts[5], special: parts[6]
-                    });
-                }
-            }
-            if (records.length === 0) throw new Error("沒有有效號碼");
-            console.log("成功載入", records.length, "期數據");
-            
-            // 只保留最新 180 期
-            if (records.length > 180) {
-                records = records.slice(0, 180);
-                console.log("已限制為最新 180 期數據");
-            }
-            
-            // 更新當前期數
-            currentIssueKey = getIssueKey(records);
-            console.log("當前期數標識:", currentIssueKey);
-            
-            return records;
-        } catch (err) {
-            console.error("載入失敗:", err);
-            return null;
+    // ===== 您的 Google Sheets API 设定 =====
+    const API_KEY = 'AIzaSyCmpR7qGwgfE3y7XIS-O1_cny_iBsDa7No';
+    const SPREADSHEET_ID = '1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw';
+    const RANGE = 'sheet1!A:G';   // 工作表名称 sheet1
+    // =======================================
+
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${RANGE}?key=${API_KEY}`;
+
+    try {
+        console.log("正在读取:", url);
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(`API ${response.status}: ${err.error?.message || '未知错误'}`);
         }
+        const data = await response.json();
+        if (!data.values || data.values.length < 2) throw new Error("试算表中没有数据");
+
+        // 自动寻找栏位索引（支援中英文标题）
+        const headers = data.values[0];
+        const n1Idx = headers.indexOf('n1');
+        const n2Idx = headers.indexOf('n2');
+        const n3Idx = headers.indexOf('n3');
+        const n4Idx = headers.indexOf('n4');
+        const n5Idx = headers.indexOf('n5');
+        const n6Idx = headers.indexOf('n6');
+        const specialIdx = headers.indexOf('special');
+
+        const useDefault = [n1Idx, n2Idx, n3Idx, n4Idx, n5Idx, n6Idx, specialIdx].some(i => i === -1);
+
+        const records = [];
+        for (let i = 1; i < data.values.length; i++) {
+            const row = data.values[i];
+            if (row.length < 7) continue;
+            if (useDefault) {
+                records.push({
+                    n1: parseInt(row[0]), n2: parseInt(row[1]), n3: parseInt(row[2]),
+                    n4: parseInt(row[3]), n5: parseInt(row[4]), n6: parseInt(row[5]), special: parseInt(row[6])
+                });
+            } else {
+                records.push({
+                    n1: parseInt(row[n1Idx]), n2: parseInt(row[n2Idx]), n3: parseInt(row[n3Idx]),
+                    n4: parseInt(row[n4Idx]), n5: parseInt(row[n5Idx]), n6: parseInt(row[n6Idx]), special: parseInt(row[specialIdx])
+                });
+            }
+        }
+
+        if (records.length === 0) throw new Error("没有有效号码");
+        console.log(`成功载入 ${records.length} 期数据`);
+
+        // 只保留最新 180 期
+        if (records.length > 180) records = records.slice(0, 180);
+
+        // 更新当前期数
+        currentIssueKey = (() => {
+            if (!records.length) return "";
+            const l = records[0];
+            return `${l.n1},${l.n2},${l.n3},${l.n4},${l.n5},${l.n6}|${l.special}`;
+        })();
+
+        return records;
+    } catch (err) {
+        console.error("载入失败:", err);
+        return null;
     }
+}
     
     function getScores(dataSeries, currentIdx) {
         const score = new Array(50).fill(0);
