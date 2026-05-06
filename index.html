@@ -406,7 +406,7 @@ async function loadCsvData() {
         const specialIdx = headers.indexOf('special');
         const useDefault = [n1Idx, n2Idx, n3Idx, n4Idx, n5Idx, n6Idx, specialIdx].some(i => i === -1);
 
-        const records = [];
+        let records = [];  // 🔧 改为 let
         for (let i = 1; i < data.values.length; i++) {
             const row = data.values[i];
             if (row.length < 7) continue;
@@ -434,7 +434,7 @@ async function loadCsvData() {
         return null;
     }
 }
-
+    
 // ==================== 核心計算函數 ====================
 function getScores(dataSeries, currentIdx) {
     const score = new Array(50).fill(0);
