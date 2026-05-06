@@ -312,26 +312,28 @@
 </div>
 
 <script>
-// 新
-const CSV_URL = "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent("https://docs.google.com/spreadsheets/d/e/2PACX-1vRHMzfO6FDzd5PrJzUOWzYN5VWny10qF_T36jZZC0nSDuLALQa5pJd8fknGIct8VngnqsAyoActIsLw/pub?output=csv");        lookback: 8,
-        decay_lambda: 0.35,
-        cold_threshold: 6,
-        hot_boost: 1.2
-    };
-    
-    let rawData = [];
-    let currentMode = "single";
-    let checkRecords = {};
-    let currentIssueKey = "";  // 當前期數的唯一標識
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSL-IDTz-iriRrPZJD82PWxKqmpsIWok3yOy-3KnHXDsjTk0frsGZZ4s42mZLYxiPdgiXTF8OlmVJul/pub?output=csv";
 
-    function loadCheckRecords() {
-        const saved = localStorage.getItem('lottery_check_records');
-        if (saved) {
-            try {
-                checkRecords = JSON.parse(saved);
-            } catch(e) { console.error(e); }
-        }
+const MODEL_CONFIG = {
+    lookback: 8,
+    decay_lambda: 0.35,
+    cold_threshold: 6,
+    hot_boost: 1.2
+};
+
+let rawData = [];
+let currentMode = "single";
+let checkRecords = {};
+let currentIssueKey = "";  // 當前期數的唯一標識
+
+function loadCheckRecords() {
+    const saved = localStorage.getItem('lottery_check_records');
+    if (saved) {
+        try {
+            checkRecords = JSON.parse(saved);
+        } catch(e) { console.error(e); }
     }
+}
 
     function saveCheckRecords() {
         localStorage.setItem('lottery_check_records', JSON.stringify(checkRecords));
