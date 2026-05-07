@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>模型命中率統計 | 六合彩 AI 分析系統</title>
+    <title>推薦統計 | 六合彩 AI 分析系統</title>
     <style>
         * {
             box-sizing: border-box;
@@ -89,12 +89,6 @@
             color: #94a3b8;
             font-size: 0.75rem;
         }
-        @media (max-width: 768px) {
-            th, td {
-                font-size: 0.7rem;
-                padding: 4px;
-            }
-        }
         .export-btn {
             background-color: #f97316;
             color: white;
@@ -104,19 +98,26 @@
             cursor: pointer;
             font-weight: 500;
             margin-bottom: 1rem;
+            float: right;
         }
         .export-btn:hover {
             background-color: #ea580c;
+        }
+        @media (max-width: 768px) {
+            th, td {
+                font-size: 0.7rem;
+                padding: 4px;
+            }
         }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="card">
-        <h1>📊 模型命中率統計</h1>
-        <p>本頁面統計所有已核對的推薦記錄（資料儲存在您的瀏覽器中）。只有當您在「核對中獎」頁面輸入開獎號碼並核對後，記錄才會納入統計。</p>
+        <h1>📊 全域推薦統計</h1>
+        <p>此頁面統計所有透過表單收集的推薦記錄（唯讀）。</p>
         <a href="/" class="back-link">← 返回首頁</a>
-        <button id="exportStatsBtn" class="export-btn" style="float: right;">📎 匯出統計 (CSV)</button>
+        <button id="exportStatsBtn" class="export-btn">📎 匯出 CSV</button>
     </div>
 
     <div id="statsContent">
@@ -128,219 +129,108 @@
 </div>
 
 <script>
-    function loadCheckRecords() {
-        const saved = localStorage.getItem('lottery_check_records');
-        if (saved) {
-            try {
-                return JSON.parse(saved);
-            } catch(e) {
-                console.error(e);
-                return {};
-            }
-        }
-        return {};
-    }
+    // ========== 設定區 ==========
+    const API_KEY = 'AIzaSyCmpR7qGwgfE3y7XIS-O1_cny_iBsDa7No';
+    const SPREADSHEET_ID = '請填入您的 Google Sheets ID';  // 例如 "1ABC...xyz"
+    const RANGE = 'Form Responses 1!A:F';  // 假設欄位 A:時間戳, B:Check Code, C:Mode, D:Params, E:Recommendations, F:Issue Key
+    // ===========================
 
-    // 辅助：根据正码命中数和特别号是否命中判断奖项（单式/膽拖）
-    function getPrize(mainHit, specialHit) {
-        if (mainHit === 6) return '頭獎';
-        if (mainHit === 5 && specialHit) return '二獎';
-        if (mainHit === 5) return '三獎';
-        if (mainHit === 4 && specialHit) return '四獎 ($9,600)';
-        if (mainHit === 4) return '五獎 ($640)';
-        if (mainHit === 3 && specialHit) return '六獎 ($320)';
-        if (mainHit === 3) return '七獎 ($40)';
-        return '未中獎';
-    }
-
-    function getPrizeReplica(matchCount) {
-        if (matchCount >= 6) return '頭獎';
-        if (matchCount === 5) return '三獎';
-        if (matchCount === 4) return '五獎 ($640)';
-        if (matchCount === 3) return '七獎 ($40)';
-        return '未中獎';
-    }
-
-    function renderStats() {
-        const records = loadCheckRecords();
-        // 只取已核對且有開獎號碼的記錄
-        const validRecords = Object.entries(records).filter(([_, rec]) => rec.checked === true && rec.drawNumbers && rec.drawNumbers.length === 6);
-        
-        if (validRecords.length === 0) {
-            document.getElementById('statsContent').innerHTML = `<div class="card">📭 暫無已核對的記錄。請先在「核對中獎」頁面輸入核對碼和開獎號碼進行核對。</div>`;
-            return;
-        }
-
-        // 總體統計變數
-        let totalDraws = validRecords.length;
-        let totalMainHits = 0;      // 命中正碼總數（單式/膽拖為每注合計？這裡統一按推薦號碼集合計）
-        let totalSpecialHits = 0;
-        let totalPossibleMain = 0;   // 推薦正碼總數（單式為 注數*6 ，複式為推薦號碼數量，膽拖為膽+拖數量）
-        let prizeCount = { '頭獎':0, '二獎':0, '三獎':0, '四獎 ($9,600)':0, '五獎 ($640)':0, '六獎 ($320)':0, '七獎 ($40)':0, '未中獎':0 };
-        let modeStats = { 'single': { count:0, totalMainHits:0, totalPossible:0 }, 'replica': { count:0, totalMainHits:0, totalPossible:0 }, 'dantuo': { count:0, totalMainHits:0, totalPossible:0 } };
-
-        // 詳細記錄陣列
-        let details = [];
-
-        for (let [code, rec] of validRecords) {
-            const drawNumbers = rec.drawNumbers;
-            const drawSpecial = rec.drawSpecial;
-            let mainHit = 0, specialHit = 0;
-            let prize = '';
-            let totalPossible = 0;
-
-            if (rec.mode === 'replica') {
-                const recommended = rec.data; // 陣列
-                const hitNumbers = recommended.filter(n => drawNumbers.includes(n));
-                mainHit = hitNumbers.length;
-                totalPossible = recommended.length;
-                prize = getPrizeReplica(mainHit);
-                totalMainHits += mainHit;
-                totalPossibleMain += totalPossible;
-                modeStats.replica.count++;
-                modeStats.replica.totalMainHits += mainHit;
-                modeStats.replica.totalPossible += totalPossible;
-                prizeCount[prize]++;
-                details.push({
-                    code, mode: '複式', drawDate: new Date(rec.timestamp).toLocaleString(),
-                    recNums: recommended.join(', '),
-                    drawNums: drawNumbers.join(','),
-                    drawSpecial,
-                    mainHit, specialHit: 0,
-                    prize, totalPossible
-                });
-            } else if (rec.mode === 'single') {
-                // 單式：有多注，我們需要累加每注的命中數（但為了公平，總推薦正碼數 = 注數 * 6）
-                let totalMainForDraw = 0;
-                let totalPossibleForDraw = rec.data.length * 6;
-                for (let ticket of rec.data) {
-                    totalMainForDraw += ticket.filter(n => drawNumbers.includes(n)).length;
-                }
-                mainHit = totalMainForDraw;
-                const hasSpecial = (rec.special === drawSpecial);
-                specialHit = hasSpecial ? 1 : 0;
-                prize = getPrize(mainHit, hasSpecial);
-                totalMainHits += mainHit;
-                totalPossibleMain += totalPossibleForDraw;
-                totalSpecialHits += specialHit;
-                modeStats.single.count++;
-                modeStats.single.totalMainHits += mainHit;
-                modeStats.single.totalPossible += totalPossibleForDraw;
-                prizeCount[prize]++;
-                // 詳細記錄：顯示每注詳細？為了簡潔，只顯示總命中數
-                details.push({
-                    code, mode: '單式', drawDate: new Date(rec.timestamp).toLocaleString(),
-                    recNums: rec.data.map(t => `[${t.join(',')}]`).join(' '),
-                    drawNums: drawNumbers.join(','),
-                    drawSpecial,
-                    mainHit, specialHit,
-                    prize, totalPossible: totalPossibleForDraw
-                });
-            } else { // dantuo
-                const recData = rec.data; // { dan: [], tuo: [] }
-                const allNums = [...recData.dan, ...recData.tuo];
-                const hitNumbers = allNums.filter(n => drawNumbers.includes(n));
-                mainHit = hitNumbers.length;
-                totalPossible = allNums.length;
-                const hasSpecial = (rec.special === drawSpecial);
-                specialHit = hasSpecial ? 1 : 0;
-                prize = getPrize(mainHit, hasSpecial);
-                totalMainHits += mainHit;
-                totalPossibleMain += totalPossible;
-                totalSpecialHits += specialHit;
-                modeStats.dantuo.count++;
-                modeStats.dantuo.totalMainHits += mainHit;
-                modeStats.dantuo.totalPossible += totalPossible;
-                prizeCount[prize]++;
-                details.push({
-                    code, mode: '膽拖', drawDate: new Date(rec.timestamp).toLocaleString(),
-                    recNums: `膽:${recData.dan.join(',')} 拖:${recData.tuo.join(',')}`,
-                    drawNums: drawNumbers.join(','),
-                    drawSpecial,
-                    mainHit, specialHit,
-                    prize, totalPossible
+    async function loadAllRecommendations() {
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${RANGE}?key=${API_KEY}`;
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            if (!data.values || data.values.length < 2) return [];
+            const headers = data.values[0];
+            const colCode = headers.indexOf('Check Code');
+            const colMode = headers.indexOf('Mode');
+            const colParams = headers.indexOf('Params');
+            const colRec = headers.indexOf('Recommendations');
+            const colIssue = headers.indexOf('Issue Key');
+            const colTimestamp = 0; // 第一列是時間戳
+            const records = [];
+            for (let i = 1; i < data.values.length; i++) {
+                const row = data.values[i];
+                records.push({
+                    timestamp: row[colTimestamp],
+                    code: row[colCode],
+                    mode: row[colMode],
+                    params: row[colParams] ? JSON.parse(row[colParams]) : {},
+                    recommendations: row[colRec] ? JSON.parse(row[colRec]) : [],
+                    issueKey: row[colIssue]
                 });
             }
+            return records;
+        } catch (err) {
+            console.error('讀取失敗:', err);
+            return [];
         }
-
-        const avgMainHit = (totalMainHits / totalDraws).toFixed(2);
-        const avgMainHitRate = (totalMainHits / totalPossibleMain * 100).toFixed(1);
-        const specialHitRate = (totalSpecialHits / totalDraws * 100).toFixed(1);
-        
-        // 渲染統計卡片
-        let statsHtml = `
-            <div class="stat-grid">
-                <div class="stat-card"><div class="stat-number">${totalDraws}</div><div>已核對期數</div></div>
-                <div class="stat-card"><div class="stat-number">${avgMainHit}</div><div>平均每期命中正碼數</div></div>
-                <div class="stat-card"><div class="stat-number">${avgMainHitRate}%</div><div>正碼總命中率</div></div>
-                <div class="stat-card"><div class="stat-number">${specialHitRate}%</div><div>特別號命中率</div></div>
-            </div>
-            <div class="card">
-                <h2>🏆 獎項分佈</h2>
-                <div class="stat-grid">
-                    ${Object.entries(prizeCount).map(([prize, cnt]) => `<div class="stat-card"><strong>${prize}</strong><br>${cnt} 次</div>`).join('')}
-                </div>
-            </div>
-            <div class="card">
-                <h2>🎲 各玩法表現</h2>
-                <table>
-                    <thead><tr><th>玩法</th><th>期數</th><th>平均每期命中正碼數</th><th>正碼命中率</th></tr></thead>
-                    <tbody>
-                        ${Object.entries(modeStats).map(([mode, stat]) => {
-                            const avg = stat.count ? (stat.totalMainHits / stat.count).toFixed(2) : '0';
-                            const rate = stat.totalPossible ? (stat.totalMainHits / stat.totalPossible * 100).toFixed(1) : '0';
-                            const name = mode === 'single' ? '單式' : (mode === 'replica' ? '複式' : '膽拖');
-                            return `<tr><td>${name}</td><td>${stat.count}</td><td>${avg}</td><td>${rate}%</td></tr>`;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-            <div class="card">
-                <h2>📋 詳細記錄</h2>
-                <div style="overflow-x:auto;">
-                    <table id="detailTable">
-                        <thead><tr><th>核對碼</th><th>玩法</th><th>日期</th><th>推薦號碼</th><th>開獎號碼</th><th>特別號</th><th>命中正碼數</th><th>特別號中</th><th>獎項</th></tr></thead>
-                        <tbody>
-                            ${details.map(d => `
-                                <tr>
-                                    <td><strong>${d.code}</strong></td>
-                                    <td>${d.mode}</td>
-                                    <td>${d.drawDate}</td>
-                                    <td title="${d.recNums}">${d.recNums.substring(0, 40)}${d.recNums.length>40 ? '…' : ''}</td>
-                                    <td>${d.drawNums}</td>
-                                    <td>${d.drawSpecial}</td>
-                                    <td>${d.mainHit} / ${d.totalPossible}</td>
-                                    <td>${d.specialHit ? '✅' : '❌'}</td>
-                                    <td>${d.prize}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-        document.getElementById('statsContent').innerHTML = statsHtml;
-
-        // 匯出 CSV
-        document.getElementById('exportStatsBtn').onclick = () => exportToCSV(details);
     }
 
-    function exportToCSV(details) {
-        const headers = ['核對碼', '玩法', '日期', '推薦號碼', '開獎號碼', '特別號', '命中正碼數/總正碼數', '特別號中', '獎項'];
-        const rows = details.map(d => [
-            d.code, d.mode, d.drawDate, d.recNums, d.drawNums, d.drawSpecial,
-            `${d.mainHit}/${d.totalPossible}`, d.specialHit ? '是' : '否', d.prize
+    function exportToCSV(records) {
+        if (!records.length) return;
+        const headers = ['時間戳', '核對碼', '玩法', '參數', '推薦號碼', '期號'];
+        const rows = records.map(r => [
+            r.timestamp,
+            r.code,
+            r.mode,
+            JSON.stringify(r.params),
+            JSON.stringify(r.recommendations),
+            r.issueKey
         ]);
         const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
         const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.href = url;
-        link.setAttribute('download', 'lottery_stats.csv');
+        link.setAttribute('download', 'lottery_recommendations.csv');
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+    }
+
+    async function renderStats() {
+        document.getElementById('statsContent').innerHTML = '<div class="card">📡 載入中...</div>';
+        const records = await loadAllRecommendations();
+        if (records.length === 0) {
+            document.getElementById('statsContent').innerHTML = '<div class="card">📭 暫無推薦記錄。</div>';
+            return;
+        }
+
+        // 統計摘要
+        const total = records.length;
+        const modeCount = { single:0, replica:0, dantuo:0 };
+        records.forEach(r => { modeCount[r.mode] = (modeCount[r.mode] || 0) + 1; });
+
+        let statsHtml = `
+            <div class="stat-grid">
+                <div class="stat-card"><div class="stat-number">${total}</div><div>總推薦數</div></div>
+                <div class="stat-card"><div class="stat-number">${modeCount.single || 0}</div><div>單式</div></div>
+                <div class="stat-card"><div class="stat-number">${modeCount.replica || 0}</div><div>複式</div></div>
+                <div class="stat-card"><div class="stat-number">${modeCount.dantuo || 0}</div><div>膽拖</div></div>
+            </div>
+            <div class="card">
+                <h2>📋 詳細記錄</h2>
+                <div style="overflow-x:auto;">
+                    <table id="detailTable">
+                        <thead><tr><th>時間</th><th>核對碼</th><th>玩法</th><th>參數</th><th>推薦號碼</th><th>期號</th></tr></thead>
+                        <tbody>
+        `;
+        records.slice().reverse().forEach(r => {
+            const recStr = JSON.stringify(r.recommendations);
+            statsHtml += `<tr>
+                <td>${new Date(r.timestamp).toLocaleString()}</td>
+                <td>${r.code}</td>
+                <td>${r.mode}</td>
+                <td>${JSON.stringify(r.params)}</td>
+                <td title="${recStr}">${recStr.substring(0, 50)}${recStr.length>50 ? '…' : ''}</td>
+                <td>${r.issueKey}</td>
+            </tr>`;
+        });
+        statsHtml += `</tbody></table></div></div>`;
+        document.getElementById('statsContent').innerHTML = statsHtml;
+        document.getElementById('exportStatsBtn').onclick = () => exportToCSV(records);
     }
 
     renderStats();
