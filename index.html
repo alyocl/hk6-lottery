@@ -335,46 +335,56 @@ let currentMode = "single";
 let checkRecords = {};
 let currentIssueKey = "";
 
-// ==================== 核對碼儲存函數 ====================
-function loadCheckRecords() {
-    const saved = localStorage.getItem('lottery_check_records');
-    if (saved) {
-        try {
-            checkRecords = JSON.parse(saved);
-        } catch(e) { console.error(e); }
-    }
-}
-function saveCheckRecords() {
-    localStorage.setItem('lottery_check_records', JSON.stringify(checkRecords));
-}
-function generateCheckCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-    return code;
-}
-function getIssueKey(dataSeries) {
-    if (!dataSeries || dataSeries.length === 0) return "";
-    const latest = dataSeries[0];
-    return `${latest.n1},${latest.n2},${latest.n3},${latest.n4},${latest.n5},${latest.n6}|${latest.special}`;
-}
-function getIssueNumber(index) {
-    let num = 47 - index;
-    if (num >= 1) return `26/${num.toString().padStart(3, '0')}`;
-    else return `期數_${index + 1}`;
-}
 function savePrediction(mode, params, data) {
+    // ========== 原有逻辑：检查是否已有相同记录 ==========
     const existingEntry = Object.entries(checkRecords).find(([key, record]) => {
-        return record.mode === mode && record.issue === currentIssueKey && JSON.stringify(record.params) === JSON.stringify(params);
+        return record.mode === mode && 
+               record.issue === currentIssueKey && 
+               JSON.stringify(record.params) === JSON.stringify(params);
     });
-    if (existingEntry) return { code: existingEntry[0], isNew: false };
-    const code = generateCheckCode();
-    checkRecords[code] = {
-        mode: mode, params: params, data: data, issue: currentIssueKey,
-        timestamp: new Date().toISOString(), checked: false
-    };
-    saveCheckRecords();
-    return { code: code, isNew: true };
+    
+    let code, isNew;
+    if (existingEntry) {
+        code = existingEntry[0];
+        isNew = false;
+    } else {
+        code = generateCheckCode();
+        checkRecords[code] = {
+            mode: mode,
+            params: params,
+            data: data,
+            issue: currentIssueKey,
+            timestamp: new Date().toISOString(),
+            checked: false
+        };
+        saveCheckRecords();
+        isNew = true;
+    }
+    
+    // ========== 新增：异步写入全局统计表 ==========
+    // 注意: 请将下面的 RECOMMENDATION_SHEET_ID 替换为您创建的 Lottery_Recommendations 表格的真实 ID
+    const RECOMMENDATION_SHEET_ID = '1_3gbK9cpzxvbXfyIWBb5oko5u6KfRWSYeL7NygQeFbQ';
+    const APPEND_URL = `https://sheets.googleapis.com/v4/spreadsheets/${RECOMMENDATION_SHEET_ID}/values/Sheet1!A:K:append?valueInputOption=USER_ENTERED&key=${API_KEY}`;
+    
+    const rowData = [
+        new Date().toISOString(),  // Timestamp
+        code,                      // CheckCode
+        mode,                      // Mode
+        JSON.stringify(params),    // Params
+        JSON.stringify(data),      // Recommendations
+        currentIssueKey,           // IssueKey
+        '', '', '', '', ''         // 预留字段 (开奖号码、特别号、命中数等)
+    ];
+    
+    // 发起异步写入请求，不阻塞用户界面
+    fetch(APPEND_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: [rowData] })
+    }).catch(e => console.error('记录推荐失败:', e));
+    // ========== 新增部分结束 ==========
+    
+    return { code: code, isNew: isNew };
 }
 
 // ==================== 號碼球顏色映射（香港六合彩真實顏色） ====================
