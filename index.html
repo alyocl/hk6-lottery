@@ -381,11 +381,11 @@ function savePrediction(mode, params, data) {
         isNew = true;
     }
 
-    // ========== 新增：异步写入全局统计表（通过 Apps Script 代理） ==========
-    const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxtV-CfD7O6DCU07idxU3cqAnDZvJHloTjsQa_ZncUfJrm5qKnuw0vBFiJJw0zZIJpAqw/exec';  // 您的 Apps Script URL
+       // ========== 异步写入全局统计表（通过 Apps Script 代理） ==========
+    const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxtV-CfD7O6DCU07idxU3cqAnDZvJHloTjsQa_ZncUfJrm5qKnuw0vBFiJJw0zZIJpAqw/exec';
     fetch(PROXY_URL, {
         method: 'POST',
-        mode: 'cors',
+        mode: 'no-cors',  // 关键修改：不再有预检请求
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             code: code,
@@ -394,16 +394,7 @@ function savePrediction(mode, params, data) {
             recommendations: data,
             issueKey: currentIssueKey
         })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.result === 'success') {
-            console.log('預測記錄已成功寫入統計表');
-        } else {
-            console.error('記錄預測失败:', data.error);
-        }
-    })
-    .catch(e => console.error('記錄預測失败:', e));
+    }).catch(e => console.error('记录推荐失败:', e));
     // ========== 新增部分结束 ==========
 
     return { code: code, isNew: isNew };
