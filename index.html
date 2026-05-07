@@ -79,7 +79,6 @@
             padding: 0.75rem 1rem;
             margin: 0.75rem 0;
         }
-        /* 号码球样式 */
         .number-ball {
             display: inline-block;
             width: 2.2rem;
@@ -284,7 +283,7 @@
 <div class="container">
     <div class="card">
         <h1>🤖 六合彩 AI 分析系統 <span class="badge">測試階段</span></h1>
-        <div class="sub">數據來源：香港賽馬會 (自動同步) · 每期開獎後22：03更新</div>
+        <div class="sub">數據來源：香港賽馬會 (自動同步) · 每期開獎後於22：03更新</div>
     </div>
 
     <div class="mode-tabs">
@@ -335,14 +334,39 @@ let currentMode = "single";
 let checkRecords = {};
 let currentIssueKey = "";
 
+// ==================== 核對碼儲存函數 ====================
+function loadCheckRecords() {
+    const saved = localStorage.getItem('lottery_check_records');
+    if (saved) {
+        try {
+            checkRecords = JSON.parse(saved);
+        } catch(e) { console.error(e); }
+    }
+}
+function saveCheckRecords() {
+    localStorage.setItem('lottery_check_records', JSON.stringify(checkRecords));
+}
+function generateCheckCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+    return code;
+}
+function getIssueKey(dataSeries) {
+    if (!dataSeries || dataSeries.length === 0) return "";
+    const latest = dataSeries[0];
+    return `${latest.n1},${latest.n2},${latest.n3},${latest.n4},${latest.n5},${latest.n6}|${latest.special}`;
+}
+function getIssueNumber(index) {
+    let num = 47 - index;
+    if (num >= 1) return `26/${num.toString().padStart(3, '0')}`;
+    else return `期數_${index + 1}`;
+}
 function savePrediction(mode, params, data) {
-    // ========== 原有逻辑：检查是否已有相同记录 ==========
+    // 原有邏輯：檢查重複
     const existingEntry = Object.entries(checkRecords).find(([key, record]) => {
-        return record.mode === mode && 
-               record.issue === currentIssueKey && 
-               JSON.stringify(record.params) === JSON.stringify(params);
+        return record.mode === mode && record.issue === currentIssueKey && JSON.stringify(record.params) === JSON.stringify(params);
     });
-    
     let code, isNew;
     if (existingEntry) {
         code = existingEntry[0];
@@ -350,22 +374,16 @@ function savePrediction(mode, params, data) {
     } else {
         code = generateCheckCode();
         checkRecords[code] = {
-            mode: mode,
-            params: params,
-            data: data,
-            issue: currentIssueKey,
-            timestamp: new Date().toISOString(),
-            checked: false
+            mode: mode, params: params, data: data, issue: currentIssueKey,
+            timestamp: new Date().toISOString(), checked: false
         };
         saveCheckRecords();
         isNew = true;
     }
-    
+
     // ========== 新增：异步写入全局统计表 ==========
-    // 注意: 请将下面的 RECOMMENDATION_SHEET_ID 替换为您创建的 Lottery_Recommendations 表格的真实 ID
     const RECOMMENDATION_SHEET_ID = '1_3gbK9cpzxvbXfyIWBb5oko5u6KfRWSYeL7NygQeFbQ';
     const APPEND_URL = `https://sheets.googleapis.com/v4/spreadsheets/${RECOMMENDATION_SHEET_ID}/values/Sheet1!A:K:append?valueInputOption=USER_ENTERED&key=${API_KEY}`;
-    
     const rowData = [
         new Date().toISOString(),  // Timestamp
         code,                      // CheckCode
@@ -373,21 +391,19 @@ function savePrediction(mode, params, data) {
         JSON.stringify(params),    // Params
         JSON.stringify(data),      // Recommendations
         currentIssueKey,           // IssueKey
-        '', '', '', '', ''         // 预留字段 (开奖号码、特别号、命中数等)
+        '', '', '', '', ''         // 预留
     ];
-    
-    // 发起异步写入请求，不阻塞用户界面
     fetch(APPEND_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ values: [rowData] })
     }).catch(e => console.error('记录推荐失败:', e));
     // ========== 新增部分结束 ==========
-    
+
     return { code: code, isNew: isNew };
 }
 
-// ==================== 號碼球顏色映射（香港六合彩真實顏色） ====================
+// ==================== 號碼球顏色映射 ====================
 function getBallClass(num) {
     const red = [1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46];
     const blue = [3,4,9,10,14,15,20,25,26,31,36,37,41,42,47,48];
@@ -558,11 +574,12 @@ async function renderSingle() {
                     <span class="number-ball ${getBallClass(latest.n4)}">${latest.n4}</span>
                     <span class="number-ball ${getBallClass(latest.n5)}">${latest.n5}</span>
                     <span class="number-ball ${getBallClass(latest.n6)}">${latest.n6}</span>
-                    <span style="margin-left: 8px;">特別號碼</span>
+                    <span style="margin-left: 8px;">特別號碼碼</span>
                     <span class="number-ball ${getBallClass(latest.special)}">${latest.special}</span>
                 </div>
             </div>
             <div><strong>📜 最近5期 (最新在上)</strong><br>${recentHtml}</div>
+            <div style="margin-top:10px;"><strong>📆 總期數：${total}</strong></div>
         </div>
         <div class="bet-selector">
             <label>🎲 選擇注數：</label>
@@ -583,11 +600,11 @@ async function renderSingle() {
         let alertHtml = '';
         if (!result.isNew) {
             alertHtml = `<div class="code-box" style="background:#fef3c7; border-color:#f97316;">
-                            ⚠️ 本期已推薦 祝你好運<br>
+                            ⚠️ 本期已預測 祝你好運<br>
                             📌 核對碼：<span class="code" style="font-size:1.2rem;">${result.code}</span>
                         </div>`;
         }
-        let resultHtml = `<div><strong>🎯 推薦 ${betVal} 注</strong></div>`;
+        let resultHtml = `<div><strong>🎯 預測 ${betVal} 注</strong></div>`;
         tickets.forEach((t,i) => resultHtml += `<div class="ticket-row">注 ${i+1}： ${t.join(', ')}</div>`);
         if (result.isNew) {
             resultHtml += `<div class="code-box"><div>📌 您的核對碼</div><div class="code">${result.code}</div><div style="font-size:0.8rem;">💡 開獎後到「核對中獎」輸入此碼</div></div>`;
@@ -638,12 +655,12 @@ async function renderReplica() {
         let alertHtml = '';
         if (!result.isNew) {
             alertHtml = `<div class="code-box" style="background:#fef3c7; border-color:#f97316;">
-                            ⚠️ 本期已推薦 祝你好運<br>
+                            ⚠️ 本期已預測 祝你好運<br>
                             📌 核對碼：<span class="code" style="font-size:1.2rem;">${result.code}</span>
                         </div>`;
         }
         
-        let numbersHtml = `<div class="combo-info"><strong>🎲 推薦 ${count} 個號碼</strong><br>`;
+        let numbersHtml = `<div class="combo-info"><strong>🎲 預測 ${count} 個號碼</strong><br>`;
         topNumbers.forEach(n => numbersHtml += `<span class="number-badge">${n}</span>`);
         numbersHtml += `</div><div class="combo-info">C(${count},6) = ${comboCount.toLocaleString()} 注<br><strong>總金額：$${totalAmount.toLocaleString()}</strong></div>`;
         
@@ -675,8 +692,8 @@ async function renderDanTuo() {
             <span class="special-number">特 ${latest.special}</span>
         </div></div>
         <div class="card">
-            <div class="row-2cols"><div class="col"><label>🎲 膽拖：</label><select id="danCountSelect">${danOptions}</select></div>
-            <div class="col"><label>📊 配腳：</label><select id="tuoCountSelect"></select><div id="tuoHint" class="info-text"></div></div></div>
+            <div class="row-2cols"><div class="col"><label>🎲 膽數量：</label><select id="danCountSelect">${danOptions}</select></div>
+            <div class="col"><label>📊 配腳數量：</label><select id="tuoCountSelect"></select><div id="tuoHint" class="info-text"></div></div></div>
             <div class="price-buttons"><button id="danPrice5Btn" class="price-btn">$5 / 注</button><button id="danPrice10Btn" class="price-btn active">$10 / 注</button></div>
             <button id="generateDanTuoBtn">🔮 開始預測</button>
         </div>
@@ -689,7 +706,7 @@ async function renderDanTuo() {
         const minTuo = 7 - danCount;
         const maxTuo = 49 - danCount;
         let opts = "";
-        for (let i = minTuo; i <= maxTuo; i++) opts += `<option value="${i}">${i} 隻配腳</option>`;
+        for (let i = minTuo; i <= maxTuo; i++) opts += `<option value="${i}">${i} 個配腳</option>`;
         document.getElementById('tuoCountSelect').innerHTML = opts;
         document.getElementById('tuoHint').innerHTML = `最少 ${minTuo} 個，最多 ${maxTuo} 個 (總號碼 ≥ 7)`;
     }
@@ -713,7 +730,7 @@ async function renderDanTuo() {
         let alertHtml = '';
         if (!result.isNew) {
             alertHtml = `<div class="code-box" style="background:#fef3c7; border-color:#f97316;">
-                            ⚠️ 本期已推薦 祝你好運<br>
+                            ⚠️ 本期已預測 祝你好運<br>
                             📌 核對碼：<span class="code" style="font-size:1.2rem;">${result.code}</span>
                         </div>`;
         }
@@ -736,10 +753,9 @@ async function renderDanTuo() {
     updateTuo();
 }
 
-// ==================== 核對中獎模式（含分注顯示、特別號併入、不自動重載） ====================
+// ==================== 核對中獎模式 ====================
 async function renderCheck() {
     loadCheckRecords();
-    // 清理超過3個月的記錄
     const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
     const now = Date.now();
     let cleanedCount = 0;
@@ -752,7 +768,6 @@ async function renderCheck() {
     }
     if (cleanedCount > 0) saveCheckRecords();
     
-    // 建構歷史記錄列表（保留）
     let historyHtml = '';
     const list = Object.entries(checkRecords).reverse();
     if (list.length === 0) {
@@ -800,15 +815,14 @@ async function renderCheck() {
         if (!specialInput) { alert('請輸入特別號碼'); return; }
         const drawNumbers = drawInput.split(',').map(n => parseInt(n.trim(), 10));
         const specialNumber = parseInt(specialInput, 10);
-        if (drawNumbers.length !== 6 || drawNumbers.some(isNaN)) { alert('請輸入6個正碼，用逗號分隔'); return; }
-        if (isNaN(specialNumber) || specialNumber < 1 || specialNumber > 49) { alert('請輸入1-49之間的特別號'); return; }
+        if (drawNumbers.length !== 6 || drawNumbers.some(isNaN)) { alert('請輸入6個攪出號碼，用逗號分隔'); return; }
+        if (isNaN(specialNumber) || specialNumber < 1 || specialNumber > 49) { alert('請輸入1-49之間的特別號碼'); return; }
         
         const record = checkRecords[code];
         if (!record) {
             document.getElementById('checkResult').innerHTML = `<div class="error-box">❌ 核對碼無效<br><span style="font-size:0.8rem;">可能原因：核對碼錯誤、記錄已超過3個月被清除</span></div>`;
             return;
         }
-        // 檢查過期
         const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
         const now = Date.now();
         const timestamp = new Date(record.timestamp).getTime();
@@ -845,7 +859,7 @@ async function renderCheck() {
             if (!anyPrize && !hasSpecialMatch) {
                 resultHtml += `<div>❌ 未中獎</div>`;
             } else if (!anyPrize && hasSpecialMatch) {
-                resultHtml += `<div>⚠️ 僅特別號中獎（無派彩）</div>`;
+                resultHtml += `<div>⚠️ 僅中特別號碼（無派彩）</div>`;
             }
         } 
         else if (record.mode === 'replica') {
@@ -859,7 +873,7 @@ async function renderCheck() {
             else if (matchCount === 3) prizeText = '🎉 中七獎 ($40)';
             else prizeText = '❌ 未中獎';
             const hitDisplay = hitNumbers.length ? hitNumbers.join(', ') : '無';
-            resultHtml += `<div>中獎推薦號碼：${hitDisplay}</div>`;
+            resultHtml += `<div>中獎預測號碼：${hitDisplay}</div>`;
             resultHtml += `<div>${prizeText}</div>`;
         } 
         else { // dantuo
@@ -878,7 +892,7 @@ async function renderCheck() {
             else prizeText = '❌ 未中獎';
             const hitDisplay = hitNumbers.length ? hitNumbers.join(', ') : '無';
             resultHtml += `<div>中獎號碼：${hitDisplay}</div>`;
-            resultHtml += `<div>特別號：${hasSpecialMatch ? '✅ 中' : '❌ 不中'}</div>`;
+            resultHtml += `<div>特別號碼：${hasSpecialMatch ? '✅ 中' : '❌ 不中'}</div>`;
             resultHtml += `<div>${prizeText}</div>`;
         }
         
@@ -886,7 +900,6 @@ async function renderCheck() {
         document.getElementById('checkResult').innerHTML = resultHtml;
         record.checked = true;
         saveCheckRecords();
-        // 不移除 setTimeout 避免自動重載，此處特意註解掉，結果會靜態保留
     };
 }
 
