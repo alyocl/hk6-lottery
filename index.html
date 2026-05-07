@@ -886,6 +886,8 @@ if (record.mode === 'single') {
     resultHtml += `</div>`;
     document.getElementById('checkResult').innerHTML = resultHtml;
     record.checked = true;
+    record.drawNumbers = drawNumbers;
+    record.drawSpecial = specialNumber;
     saveCheckRecords();
     // 移除 setTimeout，不再自動重新載入頁面
 };
