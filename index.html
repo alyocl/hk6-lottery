@@ -385,8 +385,8 @@ function savePrediction(mode, params, data) {
   const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxtV-CfD7O6DCU07idxU3cqAnDZvJHloTjsQa_ZncUfJrm5qKnuw0vBFiJJw0zZIJpAqw/exec';
 fetch(PROXY_URL, {
     method: 'POST',
-    mode: 'no-cors',  // 关键修改
-    headers: { 'Content-Type': 'application/json' },
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },  // 关键修改
     body: JSON.stringify({
         code: code,
         mode: mode,
