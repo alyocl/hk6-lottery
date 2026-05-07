@@ -382,19 +382,19 @@ function savePrediction(mode, params, data) {
     }
 
        // ========== 异步写入全局统计表（通过 Apps Script 代理） ==========
-    const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxtV-CfD7O6DCU07idxU3cqAnDZvJHloTjsQa_ZncUfJrm5qKnuw0vBFiJJw0zZIJpAqw/exec';
-    fetch(PROXY_URL, {
-        method: 'POST',
-        mode: 'no-cors',  // 关键修改：不再有预检请求
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            code: code,
-            mode: mode,
-            params: params,
-            recommendations: data,
-            issueKey: currentIssueKey
-        })
-    }).catch(e => console.error('记录推荐失败:', e));
+  const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxtV-CfD7O6DCU07idxU3cqAnDZvJHloTjsQa_ZncUfJrm5qKnuw0vBFiJJw0zZIJpAqw/exec';
+fetch(PROXY_URL, {
+    method: 'POST',
+    mode: 'no-cors',  // 关键修改
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        code: code,
+        mode: mode,
+        params: params,
+        recommendations: data,
+        issueKey: currentIssueKey
+    })
+}).catch(e => console.error('记录推荐失败:', e));
     // ========== 新增部分结束 ==========
 
     return { code: code, isNew: isNew };
