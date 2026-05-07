@@ -405,7 +405,7 @@ async function loadCsvData() {
         const n4Idx = headers.indexOf('n4'), n5Idx = headers.indexOf('n5'), n6Idx = headers.indexOf('n6');
         const specialIdx = headers.indexOf('special');
         const useDefault = [n1Idx, n2Idx, n3Idx, n4Idx, n5Idx, n6Idx, specialIdx].some(i => i === -1);
-        const records = [];
+        let records = [];
         for (let i = 1; i < data.values.length; i++) {
             const row = data.values[i];
             if (row.length < 7) continue;
