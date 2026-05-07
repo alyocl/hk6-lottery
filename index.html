@@ -363,28 +363,46 @@ function getIssueNumber(index) {
     else return `期數_${index + 1}`;
 }
 function savePrediction(mode, params, data) {
-    // ... （原有的、用于检查重复和本地存储的逻辑，请保留不动） ...
+    // 1. 首先声明变量
+    let code, isNew;
+    
+    // 2. 原有逻辑：检查重复记录
+    const existingEntry = Object.entries(checkRecords).find(([key, record]) => {
+        return record.mode === mode && record.issue === currentIssueKey && JSON.stringify(record.params) === JSON.stringify(params);
+    });
+    if (existingEntry) {
+        code = existingEntry[0];
+        isNew = false;
+    } else {
+        code = generateCheckCode();
+        checkRecords[code] = {
+            mode: mode, params: params, data: data, issue: currentIssueKey,
+            timestamp: new Date().toISOString(), checked: false
+        };
+        saveCheckRecords();
+        isNew = true;
+    }
 
-    // 新增：这部分负责把数据偷偷发给Google表单
+    // 3. 新增：通过隐藏iframe提交到Google Form（必须放在code赋值之后）
     const FORM_ACTION = 'https://docs.google.com/forms/d/e/1FAIpQLSeYkeOO3JHFx7lIz-4YjF3yQ7eHUQHPh2QRQDleD0jnYS_mhQ/formResponse';
     const iframe = document.createElement('iframe');
-    iframe.name = 'hiddenFrame';
+    iframe.name = 'hidden-frame';
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
 
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = FORM_ACTION;
-    form.target = 'hiddenFrame';
+    form.target = 'hidden-frame';
     form.style.display = 'none';
 
-    // 把你刚才从“预填充链接”里获取到的 entry ID 填在这里
+    // 使用您之前获取的entry ID
     const fieldMapping = {
-        'entry.497469535': code,                     // 对应 Check Code
-        'entry.2130058932': mode,                    // 对应 Mode
-        'entry.932982564': JSON.stringify(params),   // 对应 Params
-        'entry.1578146059': JSON.stringify(data),    // 对应 Recommendations
-        'entry.1684128741': currentIssueKey          // 对应 Issue Key
+        'entry.497469535': code,
+        'entry.2130058932': mode,
+        'entry.932982564': JSON.stringify(params),
+        'entry.1578146059': JSON.stringify(data),
+        'entry.1684128741': currentIssueKey
     };
 
     for (const [name, value] of Object.entries(fieldMapping)) {
@@ -398,14 +416,14 @@ function savePrediction(mode, params, data) {
     document.body.appendChild(form);
     form.submit();
 
+    // 清理iframe和form
     setTimeout(() => {
-        document.body.removeChild(iframe);
-        document.body.removeChild(form);
+        if (document.body.contains(iframe)) document.body.removeChild(iframe);
+        if (document.body.contains(form)) document.body.removeChild(form);
     }, 3000);
 
     return { code: code, isNew: isNew };
 }
-
 // ==================== 號碼球顏色映射 ====================
 function getBallClass(num) {
     const red = [1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46];
