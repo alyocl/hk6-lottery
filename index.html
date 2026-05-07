@@ -380,11 +380,11 @@ function savePrediction(mode, params, data) {
 
     // 把你刚才从“预填充链接”里获取到的 entry ID 填在这里
     const fieldMapping = {
-        entry_1: code,          // 例如 entry.123456
-        entry_2: mode,          // 这里 entry_2, entry_3 只是例子，请替换成你获取的真实ID
-        entry_3: JSON.stringify(params),
-        entry_4: JSON.stringify(data),
-        entry_5: currentIssueKey
+        'entry.497469535': code,                     // 对应 Check Code
+        'entry.2130058932': mode,                    // 对应 Mode
+        'entry.932982564': JSON.stringify(params),   // 对应 Params
+        'entry.1578146059': JSON.stringify(data),    // 对应 Recommendations
+        'entry.1684128741': currentIssueKey          // 对应 Issue Key
     };
 
     for (const [name, value] of Object.entries(fieldMapping)) {
