@@ -284,7 +284,7 @@
 <div class="container">
     <div class="card">
         <h1>🤖 六合彩 AI 分析系統 <span class="badge">測試階段</span></h1>
-        <div class="sub">數據來源：香港賽馬會 · 每期開獎後更新</div>
+        <div class="sub">數據來源：Google Sheets API (自動同步) · 每期開獎後更新</div>
     </div>
 
     <div class="mode-tabs">
@@ -304,7 +304,7 @@
     </div>
     
     <div class="footer-note">
-        ✅ 生成預測後會獲得核對碼，同一期內相同玩法不會重複生成
+        ✅ 生成推薦後會獲得核對碼，同一期內相同玩法不會重複生成
     </div>
     
     <div class="responsible-gambling">
@@ -553,7 +553,8 @@ async function renderSingle() {
                 </div>
             </div>
             <div><strong>📜 最近5期 (最新在上)</strong><br>${recentHtml}</div>
-         </div>
+            <div style="margin-top:10px;"><strong>📆 總期數：${total}</strong></div>
+        </div>
         <div class="bet-selector">
             <label>🎲 選擇注數：</label>
             <select id="betSelect">
