@@ -363,39 +363,45 @@ function getIssueNumber(index) {
     else return `期數_${index + 1}`;
 }
 function savePrediction(mode, params, data) {
-    // ========== 原有邏輯：檢查重複 ==========
-    const existingEntry = Object.entries(checkRecords).find(([key, record]) => {
-        return record.mode === mode && record.issue === currentIssueKey && JSON.stringify(record.params) === JSON.stringify(params);
-    });
-    let code, isNew;
-    if (existingEntry) {
-        code = existingEntry[0];
-        isNew = false;
-    } else {
-        code = generateCheckCode();
-        checkRecords[code] = {
-            mode: mode, params: params, data: data, issue: currentIssueKey,
-            timestamp: new Date().toISOString(), checked: false
-        };
-        saveCheckRecords();
-        isNew = true;
+    // ... （原有的、用于检查重复和本地存储的逻辑，请保留不动） ...
+
+    // 新增：这部分负责把数据偷偷发给Google表单
+    const FORM_ACTION = 'https://docs.google.com/forms/d/e/1FAIpQLSeYkeOO3JHFx7lIz-4YjF3yQ7eHUQHPh2QRQDleD0jnYS_mhQ/formResponse';
+    const iframe = document.createElement('iframe');
+    iframe.name = 'hiddenFrame';
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = FORM_ACTION;
+    form.target = 'hiddenFrame';
+    form.style.display = 'none';
+
+    // 把你刚才从“预填充链接”里获取到的 entry ID 填在这里
+    const fieldMapping = {
+        entry_1: code,          // 例如 entry.123456
+        entry_2: mode,          // 这里 entry_2, entry_3 只是例子，请替换成你获取的真实ID
+        entry_3: JSON.stringify(params),
+        entry_4: JSON.stringify(data),
+        entry_5: currentIssueKey
+    };
+
+    for (const [name, value] of Object.entries(fieldMapping)) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
     }
 
-       // ========== 异步写入全局统计表（通过 Apps Script 代理） ==========
-  const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxtV-CfD7O6DCU07idxU3cqAnDZvJHloTjsQa_ZncUfJrm5qKnuw0vBFiJJw0zZIJpAqw/exec';
-fetch(PROXY_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'text/plain' },  // 关键修改
-    body: JSON.stringify({
-        code: code,
-        mode: mode,
-        params: params,
-        recommendations: data,
-        issueKey: currentIssueKey
-    })
-}).catch(e => console.error('记录推荐失败:', e));
-    // ========== 新增部分结束 ==========
+    document.body.appendChild(form);
+    form.submit();
+
+    setTimeout(() => {
+        document.body.removeChild(iframe);
+        document.body.removeChild(form);
+    }, 3000);
 
     return { code: code, isNew: isNew };
 }
@@ -571,12 +577,11 @@ async function renderSingle() {
                     <span class="number-ball ${getBallClass(latest.n4)}">${latest.n4}</span>
                     <span class="number-ball ${getBallClass(latest.n5)}">${latest.n5}</span>
                     <span class="number-ball ${getBallClass(latest.n6)}">${latest.n6}</span>
-                    <span style="margin-left: 8px;">特別號碼碼</span>
+                    <span style="margin-left: 8px;">特別號碼</span>
                     <span class="number-ball ${getBallClass(latest.special)}">${latest.special}</span>
                 </div>
             </div>
             <div><strong>📜 最近5期 (最新在上)</strong><br>${recentHtml}</div>
-            <div style="margin-top:10px;"><strong>📆 總期數：${total}</strong></div>
         </div>
         <div class="bet-selector">
             <label>🎲 選擇注數：</label>
@@ -679,7 +684,7 @@ async function renderDanTuo() {
     
     const html = `
         <div class="card">
-            <div class="row-2cols"><div class="col"><label>🎲 膽碼數量：</label><select id="danCountSelect">${danOptions}</select></div>
+            <div class="row-2cols"><div class="col"><label>🎲 膽數量：</label><select id="danCountSelect">${danOptions}</select></div>
             <div class="col"><label>📊 配腳數量：</label><select id="tuoCountSelect"></select><div id="tuoHint" class="info-text"></div></div></div>
             <div class="price-buttons"><button id="danPrice5Btn" class="price-btn">$5 / 注</button><button id="danPrice10Btn" class="price-btn active">$10 / 注</button></div>
             <button id="generateDanTuoBtn">🔮 開始預測</button>
