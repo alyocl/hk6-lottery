@@ -90,6 +90,7 @@
         .hot { background-color: #dc2626; color: white; }
         .warm { background-color: #f97316; color: white; }
         .cold { background-color: #3b82f6; color: white; }
+        .blind { background-color: #64748b; color: white; }  /* 盲門灰色 */
         .neutral { background-color: #cbd5e1; color: #1e293b; }
         table {
             width: 100%;
@@ -141,7 +142,6 @@
             .number-badge { width: 32px; height: 32px; line-height: 32px; font-size: 0.8rem; }
         }
     </style>
-    <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -168,9 +168,9 @@
     const SPREADSHEET_ID = '1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw';
     const RANGE = 'sheet1!A:H';  // A:期號, B~G: n1~n6, H: special
 
-    let rawData = [];       // 儲存所有期數的 { issue, n1..n6, special }
+    let rawData = [];
 
-    // ==================== 顏色定義 (與 index.html 一致) ====================
+    // 顏色定義
     const redNumbers = [1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46];
     const blueNumbers = [3,4,9,10,14,15,20,25,26,31,36,37,41,42,47,48];
     const greenNumbers = [5,6,11,16,17,21,22,27,28,32,33,38,39,43,44,49];
@@ -182,7 +182,7 @@
         return 'unknown';
     }
 
-    // ==================== 讀取 Google Sheets ====================
+    // 讀取數據
     async function loadData() {
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${RANGE}?key=${API_KEY}`;
         try {
@@ -214,72 +214,59 @@
         }
     }
 
-    // ==================== 統計分析函數 ====================
-    // 獲取所有正碼 (不含特別號)
-    function getAllMainNumbers(data) {
-        let nums = [];
-        for (let row of data) {
-            nums.push(row.n1, row.n2, row.n3, row.n4, row.n5, row.n6);
-        }
-        return nums;
-    }
-
-    // 計算每個號碼出現次數 (1-49)
+    // 取得所有正碼頻率 (1-49)
     function getFrequency(data) {
         const freq = new Array(50).fill(0);
         for (let row of data) {
-            freq[row.n1]++;
-            freq[row.n2]++;
-            freq[row.n3]++;
-            freq[row.n4]++;
-            freq[row.n5]++;
-            freq[row.n6]++;
+            freq[row.n1]++; freq[row.n2]++; freq[row.n3]++;
+            freq[row.n4]++; freq[row.n5]++; freq[row.n6]++;
         }
         return freq;
     }
 
-    // 最近 N 期頻率 (用於熱冷號)
+    // 最近 N 期頻率
     function getRecentFrequency(data, lastN) {
         const recent = data.slice(0, lastN);
         const freq = new Array(50).fill(0);
         for (let row of recent) {
-            freq[row.n1]++;
-            freq[row.n2]++;
-            freq[row.n3]++;
-            freq[row.n4]++;
-            freq[row.n5]++;
-            freq[row.n6]++;
+            freq[row.n1]++; freq[row.n2]++; freq[row.n3]++;
+            freq[row.n4]++; freq[row.n5]++; freq[row.n6]++;
         }
         return freq;
     }
 
-    // 奇偶統計
+    // 盲門：從未出現的號碼（根據正碼頻率）
+    function getBlindNumbers(freqAll) {
+        let blind = [];
+        for (let i = 1; i <= 49; i++) {
+            if (freqAll[i] === 0) blind.push(i);
+        }
+        return blind;
+    }
+
+    // 其他統計函數 (奇偶、大小、和值、區間、連號、尾數、顏色)
     function getOddEvenStats(data) {
         let oddCounts = [];
         for (let row of data) {
-            const numbers = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6];
-            const odd = numbers.filter(n => n % 2 === 1).length;
+            const nums = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6];
+            const odd = nums.filter(n => n % 2 === 1).length;
             oddCounts.push(odd);
         }
         const dist = new Array(7).fill(0);
         for (let cnt of oddCounts) dist[cnt]++;
         return dist;
     }
-
-    // 大小統計 (>=25 為大)
     function getBigSmallStats(data) {
         let bigCounts = [];
         for (let row of data) {
-            const numbers = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6];
-            const big = numbers.filter(n => n >= 25).length;
+            const nums = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6];
+            const big = nums.filter(n => n >= 25).length;
             bigCounts.push(big);
         }
         const dist = new Array(7).fill(0);
         for (let cnt of bigCounts) dist[cnt]++;
         return dist;
     }
-
-    // 和值統計
     function getSumStats(data) {
         let sums = [];
         for (let row of data) {
@@ -288,8 +275,6 @@
         }
         return sums;
     }
-
-    // 區間分佈 (1-10,11-20,21-30,31-40,41-49)
     function getRangeStats(data) {
         const ranges = [0,0,0,0,0];
         for (let row of data) {
@@ -304,52 +289,44 @@
         }
         return ranges;
     }
-
-    // 連號統計
     function getConsecutiveStats(data) {
-        let consecutivePairs = 0;
-        let consecutiveTriplets = 0;
+        let pairs = 0, triplets = 0;
         for (let row of data) {
             const nums = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6].sort((a,b)=>a-b);
             for (let i = 0; i < nums.length-1; i++) {
                 if (nums[i+1] - nums[i] === 1) {
-                    consecutivePairs++;
-                    if (i+2 < nums.length && nums[i+2] - nums[i+1] === 1) consecutiveTriplets++;
+                    pairs++;
+                    if (i+2 < nums.length && nums[i+2] - nums[i+1] === 1) triplets++;
                 }
             }
         }
-        return { pairs: consecutivePairs, triplets: consecutiveTriplets, totalDraws: data.length };
+        return { pairs, triplets, totalDraws: data.length };
     }
-
-    // 尾數分佈
     function getLastDigitStats(data) {
         const digits = new Array(10).fill(0);
         for (let row of data) {
             const nums = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6];
             for (let n of nums) {
-                const last = n % 10;
-                digits[last]++;
+                digits[n % 10]++;
             }
         }
         return digits;
     }
-
-    // 顏色分佈統計 (正碼)
     function getColorStats(data) {
-        let redCount = 0, blueCount = 0, greenCount = 0;
+        let red = 0, blue = 0, green = 0;
         for (let row of data) {
             const nums = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6];
             for (let n of nums) {
-                const color = getNumberColor(n);
-                if (color === 'red') redCount++;
-                else if (color === 'blue') blueCount++;
-                else if (color === 'green') greenCount++;
+                const c = getNumberColor(n);
+                if (c === 'red') red++;
+                else if (c === 'blue') blue++;
+                else if (c === 'green') green++;
             }
         }
-        return { red: redCount, blue: blueCount, green: greenCount };
+        return { red, blue, green };
     }
 
-    // ==================== 渲染 UI ====================
+    // 渲染主頁
     function renderStats(data) {
         const totalDraws = data.length;
         const freqAll = getFrequency(data);
@@ -362,27 +339,24 @@
         const lastDigitDist = getLastDigitStats(data);
         const colorStats = getColorStats(data);
         const totalNumbers = totalDraws * 6;
+        const blindNumbers = getBlindNumbers(freqAll);
 
-        // 準備熱冷號列表 (基於最近20期)
+        // 熱冷號 (基於最近20期)
         let numbers = Array.from({length:49}, (_,i)=>i+1);
         numbers.sort((a,b) => recentFreq[b] - recentFreq[a]);
         const hotNumbers = numbers.slice(0, 10);
         const coldNumbers = numbers.slice(-10).reverse();
 
-        // 計算平均和值、中位數等
         const avgSum = (sums.reduce((a,b)=>a+b,0) / sums.length).toFixed(1);
         sums.sort((a,b)=>a-b);
         const medianSum = sums[Math.floor(sums.length/2)];
         const minSum = sums[0];
         const maxSum = sums[sums.length-1];
-
-        // 頻率表 (前15)
         const topFreq = numbers.slice(0, 15).map(n => ({ num: n, count: freqAll[n] }));
 
-        // 構建 HTML
         let html = `
             <div class="stats-grid">
-                <!-- 熱門號碼 & 冷門號碼 -->
+                <!-- 熱門、冷門、盲門卡片 -->
                 <div class="stat-card">
                     <h3>🔥 近期熱號 (最近20期)</h3>
                     <div class="number-list">
@@ -392,7 +366,11 @@
                     <div class="number-list">
                         ${coldNumbers.map(n => `<span class="number-badge cold">${n}</span>`).join('')}
                     </div>
-                    <div class="info-note">註：熱號 = 出現次數最多；冷號 = 出現次數最少 (平局按號碼排序)</div>
+                    <h3 style="margin-top: 1rem;">🚪 盲門 (從未開出正碼)</h3>
+                    <div class="number-list">
+                        ${blindNumbers.length ? blindNumbers.map(n => `<span class="number-badge blind">${n}</span>`).join('') : '<span>無盲門號碼</span>'}
+                    </div>
+                    <div class="info-note">熱號=出現最多；冷號=出現最少；盲門=歷史正碼從未出現</div>
                 </div>
 
                 <!-- 整體頻率 TOP15 -->
@@ -406,47 +384,44 @@
                     </table>
                 </div>
 
-                <!-- 顏色分佈 (新增) -->
+                <!-- 顏色分佈 -->
                 <div class="stat-card">
                     <h3>🎨 顏色分佈 (紅/藍/綠)</h3>
                     <canvas id="colorChart" width="400" height="200"></canvas>
                     <div class="info-note">🔴 紅色 ${colorStats.red} 次 (${(colorStats.red/totalNumbers*100).toFixed(1)}%) &nbsp;|&nbsp;
                     🔵 藍色 ${colorStats.blue} 次 (${(colorStats.blue/totalNumbers*100).toFixed(1)}%) &nbsp;|&nbsp;
                     🟢 綠色 ${colorStats.green} 次 (${(colorStats.green/totalNumbers*100).toFixed(1)}%)</div>
-                    <div class="info-note">註：基於所有正碼統計，共 ${totalNumbers} 個號碼</div>
                 </div>
 
-                <!-- 奇偶比例分佈 -->
+                <!-- 奇偶比例 -->
                 <div class="stat-card">
                     <h3>⚖️ 奇偶比例分佈</h3>
-                    <canvas id="oddEvenChart" width="400" height="200"></canvas>
-                    <div class="info-note">顯示每期奇數個數的出現次數 (0~6)</div>
+                    <canvas id="oddEvenChart"></canvas>
                 </div>
 
-                <!-- 大小比例分佈 -->
+                <!-- 大小比例 -->
                 <div class="stat-card">
                     <h3>📏 大小比例分佈 (≥25為大)</h3>
-                    <canvas id="bigSmallChart" width="400" height="200"></canvas>
-                    <div class="info-note">顯示每期大號個數的出現次數</div>
+                    <canvas id="bigSmallChart"></canvas>
                 </div>
 
                 <!-- 和值統計 -->
                 <div class="stat-card">
                     <h3>➕ 和值統計</h3>
-                    <canvas id="sumHistogram" width="400" height="200"></canvas>
+                    <canvas id="sumHistogram"></canvas>
                     <div>📊 平均和值: ${avgSum} &nbsp;| 中位數: ${medianSum} &nbsp;| 範圍: ${minSum} ~ ${maxSum}</div>
                 </div>
 
                 <!-- 區間分佈 -->
                 <div class="stat-card">
                     <h3>📌 區間分佈 (1-10,11-20,21-30,31-40,41-49)</h3>
-                    <canvas id="rangeChart" width="400" height="200"></canvas>
+                    <canvas id="rangeChart"></canvas>
                 </div>
 
                 <!-- 尾數分佈 -->
                 <div class="stat-card">
                     <h3>🔢 尾數分佈 (0-9)</h3>
-                    <canvas id="lastDigitChart" width="400" height="200"></canvas>
+                    <canvas id="lastDigitChart"></canvas>
                 </div>
 
                 <!-- 連號統計 -->
@@ -472,7 +447,6 @@
             data: { labels: ['0大','1大','2大','3大','4大','5大','6大'], datasets: [{ label: '期數', data: bigSmallDist, backgroundColor: '#3b82f6' }] },
             options: { responsive: true }
         });
-        // 和值直方圖
         const sumBins = [0,80,100,120,140,160,180,200];
         const sumHist = new Array(sumBins.length-1).fill(0);
         for (let s of sums) {
@@ -497,7 +471,6 @@
             data: { labels: ['0','1','2','3','4','5','6','7','8','9'], datasets: [{ label: '出現次數', data: lastDigitDist, backgroundColor: '#ec489a' }] },
             options: { responsive: true }
         });
-        // 顏色分佈圖 (圓餅圖)
         new Chart(document.getElementById('colorChart'), {
             type: 'pie',
             data: { labels: ['紅色 (🔴)', '藍色 (🔵)', '綠色 (🟢)'], datasets: [{ data: [colorStats.red, colorStats.blue, colorStats.green], backgroundColor: ['#dc2626', '#3b82f6', '#10b981'] }] },
@@ -505,7 +478,6 @@
         });
     }
 
-    // ==================== 初始化 ====================
     async function init() {
         const data = await loadData();
         if (!data || data.length === 0) {
