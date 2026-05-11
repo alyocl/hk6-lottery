@@ -139,7 +139,7 @@
         const replica = stats.replica;
         const dantuo = stats.dantuo;
 
-        // 確保每個分佈都有足夠長度 (0-6 共7個, 膽0-2共3個)
+        // 強制將陣列長度補到 7 (0-6) 同 3 (0-2)
         function ensure7(arr) {
             let a = [...arr];
             while (a.length < 7) a.push(0);
@@ -166,26 +166,50 @@
         const danAtLeast1 = danDist.slice(1).reduce((a,b)=>a+b,0);
         const danRate1Plus = dantuo.total ? (danAtLeast1 / dantuo.total * 100).toFixed(2) : '0';
 
-        // 人手建立表格列（確保7格）
-        const replicaRow = `<tr>${replicaDist.map(v => `<td>${v}</td>`).join('')}</tr>`;
-        const tuoRow = `<tr>${tuoDist.map(v => `<td>${v}</td>`).join('')}</tr>`;
-        const danRow = `<tr>${danDist.map(v => `<td>${v}</td>`).join('')}</tr>`;
+        // ** 人手寫死 7 格表格，確保每個格子都有數字 **
+        // 複式行
+        const replicaRow = `
+            </tr>
+                <td>${replicaDist[0]}</td><td>${replicaDist[1]}</td><td>${replicaDist[2]}</td>
+                <td>${replicaDist[3]}</td><td>${replicaDist[4]}</td><td>${replicaDist[5]}</td>
+                <td>${replicaDist[6]}</td>
+            </tr>
+        `;
+        // 拖碼行
+        const tuoRow = `
+            <tr>
+                <td>${tuoDist[0]}</td><td>${tuoDist[1]}</td><td>${tuoDist[2]}</td>
+                <td>${tuoDist[3]}</td><td>${tuoDist[4]}</td><td>${tuoDist[5]}</td>
+                <td>${tuoDist[6]}</td>
+            </tr>
+        `;
+        // 膽碼行
+        const danRow = `
+            <tr>
+                <td>${danDist[0]}</td><td>${danDist[1]}</td><td>${danDist[2]}</td>
+            </tr>
+        `;
 
         const html = `
             <div class="card">
                 <h3>📌 單式 (用戶生成注)</h3>
                 <p>總注數：<strong>${single.total}</strong> &nbsp; | &nbsp; 🎯 至少中3個號碼的比例：<span class="metric">${singleRate3Plus}%</span></p>
-                <table><thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
-                <tbody><tr><td><strong>注數</strong></td>${single.dist.map(c => `<td>${c}</td>`).join('')}</tr>
-                <tr><td><strong>百分比</strong></td>${singlePercent.map(p => `<td>${p}%</td>`).join('')}</tr></tbody>
+                <table>
+                    <thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>注數</strong></td>${single.dist.map(c => `<td>${c}</td>`).join('')}</tr>
+                        <tr><td><strong>百分比</strong></td>${singlePercent.map(p => `<td>${p}%</td>`).join('')}</tr>
+                    </tbody>
                 </table>
                 <div class="info-note">註：每注命中3個以上即為有獎（七獎$40）</div>
             </div>
             <div class="card">
                 <h3>🔢 複式 (推薦N碼)</h3>
                 <p>總生成次數：<strong>${replica.total}</strong> &nbsp; | &nbsp; 📊 平均包含中獎號碼數：<span class="metric">${replicaAvgHit}</span> / 6 &nbsp; | &nbsp; 🎯 包含至少3個中獎號碼的比例：<span class="metric">${replicaRate3Plus}%</span></p>
-                <table><thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
-                <tbody>${replicaRow}</tbody></table>
+                <table>
+                    <thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
+                    <tbody>${replicaRow}</tbody>
+                </table>
                 <canvas id="replicaChart"></canvas>
             </div>
             <div class="card">
@@ -193,10 +217,14 @@
                 <p>總生成次數：<strong>${dantuo.total}</strong></p>
                 <p>🎯 膽碼平均命中數：<span class="metric">${danAvgHit}</span> / 2 &nbsp; | &nbsp; 膽碼命中≥1的比例：${danRate1Plus}%</p>
                 <p>🎲 拖碼平均命中數：<span class="metric">${tuoAvgHit}</span> / 6</p>
-                <table><thead><tr><th>膽碼命中</th><th>0</th><th>1</th><th>2</th></tr></thead>
-                <tbody>${danRow}</tbody></table>
-                <table style="margin-top:12px"><thead><tr><th>拖碼命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
-                <tbody>${tuoRow}</tbody></table>
+                <table>
+                    <thead><tr><th>膽碼命中</th><th>0</th><th>1</th><th>2</th></tr></thead>
+                    <tbody>${danRow}</tbody>
+                </table>
+                <table style="margin-top:12px">
+                    <thead><tr><th>拖碼命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
+                    <tbody>${tuoRow}</tbody>
+                </table>
                 <canvas id="dantuoChart"></canvas>
             </div>
             <div class="info-note">✅ 統計基於 ${predictions.length} 筆用戶預測記錄（匹配到開獎結果）。更新時間：${new Date().toLocaleString()}</div>
