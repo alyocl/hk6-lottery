@@ -7,24 +7,24 @@
     <style>
         * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans TC', sans-serif; }
         body { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); margin: 0; padding: 20px; min-height: 100vh; }
-        .container { max-width: 1200px; margin: 0 auto; background: rgba(255,255,255,0.1); backdrop-filter: blur(2px); border-radius: 2rem; padding: 1.5rem; box-shadow: 0 20px 35px -10px rgba(0,0,0,0.4); }
+        .container { max-width: 900px; margin: 0 auto; background: rgba(255,255,255,0.1); backdrop-filter: blur(2px); border-radius: 2rem; padding: 1.5rem; box-shadow: 0 20px 35px -10px rgba(0,0,0,0.4); }
         .card { background: white; border-radius: 1.5rem; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
         h1 { margin: 0 0 0.25rem 0; font-size: 1.8rem; color: #0f172a; display: flex; align-items: center; gap: 8px; }
         .badge { background: #10b981; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 40px; }
         .sub { color: #475569; font-size: 0.85rem; border-left: 3px solid #f97316; padding-left: 0.75rem; margin-top: 6px; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
-        .stat-card { background: #f8fafc; border-radius: 1rem; padding: 1rem; border: 1px solid #e2e8f0; }
-        .stat-card h3 { margin-top: 0; color: #0f172a; border-bottom: 2px solid #f97316; display: inline-block; padding-bottom: 4px; }
-        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-        th, td { padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0; }
-        th { background-color: #f1f5f9; }
-        .metric { font-size: 1.8rem; font-weight: bold; color: #f97316; }
+        h3 { margin-top: 0; color: #0f172a; border-bottom: 2px solid #f97316; display: inline-block; padding-bottom: 4px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { padding: 8px 6px; text-align: center; border-bottom: 1px solid #e2e8f0; }
+        th { background-color: #f1f5f9; font-weight: 600; }
+        .metric { font-size: 1.4rem; font-weight: bold; color: #f97316; }
         .info-note { font-size: 0.75rem; color: #475569; margin-top: 8px; text-align: center; }
         .footer-links { text-align: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; }
         .footer-links a { color: #f97316; text-decoration: none; margin: 0 10px; font-size: 0.8rem; }
-        canvas { max-height: 250px; width: 100%; }
+        canvas { max-height: 200px; width: 100%; margin-top: 10px; }
         .loading { text-align: center; padding: 2rem; color: #475569; }
         .error-box { background: #fee2e2; border-radius: 1rem; padding: 1rem; text-align: center; color: #dc2626; }
+        .stat-block { margin-bottom: 24px; }
+        .small-note { font-size: 0.7rem; color: #6b7280; text-align: center; margin-top: 8px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -41,34 +41,23 @@
 <script>
     // ==================== Google Sheets 設定 ====================
     const API_KEY = 'AIzaSyCmpR7qGwgfE3y7XIS-O1_cny_iBsDa7No';
-    // 開獎結果表 (A:期號, B~G: n1~n6, H: special)
     const RESULT_SHEET_ID = '1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw';
     const RESULT_RANGE = 'sheet1!A:H';
-    // 用戶預測表 (列：時間戳記, Check Code, Mode, Params, Recommendations, Issue Key)
     const PREDICT_SHEET_ID = '1ddt9iUMO4FYqJI5_mnoSU5LmgcFW8XKeI043UPY-iKk';
-    const PREDICT_RANGE = 'Form Responses 1!A:F';  // 請確認工作表名稱，預設為「Form Responses 1」
+    const PREDICT_RANGE = 'Form Responses 1!A:F';
 
-    let resultMap = new Map();   // key = Issue Key (如 "6,14,20,23,28,34|49") -> { issue, numbers, special }
-    let predictions = [];        // store each prediction with parsed info
+    let resultMap = new Map();
+    let predictions = [];
 
-    // ==================== 輔助函數 ====================
     function parseRecommendations(recStr, mode) {
         try {
-            if (mode === 'single') {
-                // 格式如 "[[1,8,28,33,35,41],[8,19,35,41,46,47],...]"
-                return JSON.parse(recStr);
-            } else if (mode === 'replica') {
-                // 格式如 "[1,8,15,19,28,33,35,41]"
-                return JSON.parse(recStr);
-            } else if (mode === 'dantuo') {
-                // 格式如 "{\"dan\":[1,19,35],\"tuo\":[8,15,26,27,28,30,33,41,46]}"
-                return JSON.parse(recStr);
-            }
-        } catch(e) { console.error("解析推薦號碼失敗", recStr, e); return null; }
+            if (mode === 'single') return JSON.parse(recStr);
+            if (mode === 'replica') return JSON.parse(recStr);
+            if (mode === 'dantuo') return JSON.parse(recStr);
+        } catch(e) { console.error("解析失敗", recStr, e); return null; }
         return null;
     }
 
-    // 載入開獎結果表
     async function loadResults() {
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${RESULT_SHEET_ID}/values/${RESULT_RANGE}?key=${API_KEY}`;
         const resp = await fetch(url);
@@ -90,172 +79,151 @@
         console.log(`開獎結果載入完成，共 ${resultMap.size} 期`);
     }
 
-    // 載入用戶預測表
     async function loadPredictions() {
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${PREDICT_SHEET_ID}/values/${PREDICT_RANGE}?key=${API_KEY}`;
         const resp = await fetch(url);
         if (!resp.ok) throw new Error(`預測表讀取失敗: ${resp.status}`);
         const data = await resp.json();
         if (!data.values || data.values.length < 2) throw new Error("預測表無數據");
-        // 假設第一行為標題列：時間戳記, Check Code, Mode, Params, Recommendations, Issue Key
         for (let i = 1; i < data.values.length; i++) {
             const row = data.values[i];
             if (row.length < 6) continue;
-            const timestamp = row[0];
-            const checkCode = row[1];
             const mode = row[2];
-            const paramsStr = row[3];
             const recStr = row[4];
-            const issueKey = row[5];   // 格式如 "6,14,20,23,28,34|49"
+            const issueKey = row[5];
             if (!issueKey) continue;
             const result = resultMap.get(issueKey);
-            if (!result) {
-                // 可能該期還未開獎或數據未同步，跳過
-                console.warn(`未找到對應開獎結果: ${issueKey}`);
-                continue;
-            }
+            if (!result) continue;
             const rec = parseRecommendations(recStr, mode);
             if (!rec) continue;
             predictions.push({
-                timestamp, checkCode, mode, paramsStr, rec, issueKey,
-                resultNumbers: result.numbers,
-                resultSpecial: result.special,
-                issue: result.issue
+                mode, rec, resultNumbers: result.numbers
             });
         }
         console.log(`用戶預測載入完成，共 ${predictions.length} 筆有效匹配`);
     }
 
-    // ==================== 統計分析 ====================
     function computeStats() {
-        // 單式統計：每注命中個數分佈 (0-6)
         let singleHitDist = [0,0,0,0,0,0,0];
-        let singleTotalTickets = 0;
-        let singleAtLeast3 = 0;
-
-        // 複式統計：推薦集合中包含中獎號碼的個數
+        let singleTotal = 0;
         let replicaHitDist = [0,0,0,0,0,0,0];
-        let replicaTotalDraws = 0;
+        let replicaTotal = 0;
+        let danHitDist = [0,0,0];
+        let tuoHitDist = [0,0,0,0,0,0,0];
+        let dantuoTotal = 0;
 
-        // 膽拖統計
-        let danHitDist = [0,0,0];   // 膽碼命中個數 0,1,2
-        let tuoHitDist = [0,0,0,0,0,0,0]; // 拖碼命中個數 0~6
-        let dantuoTotalDraws = 0;
-
-        for (let pred of predictions) {
-            const mode = pred.mode;
-            const resultNums = pred.resultNumbers;
+        for (let p of predictions) {
+            const mode = p.mode;
+            const resultNums = p.resultNumbers;
             if (mode === 'single') {
-                const tickets = pred.rec;
-                for (let ticket of tickets) {
-                    const hitCount = ticket.filter(n => resultNums.includes(n)).length;
-                    if (hitCount >= 0 && hitCount <= 6) singleHitDist[hitCount]++;
-                    singleTotalTickets++;
-                    if (hitCount >= 3) singleAtLeast3++;
+                for (let ticket of p.rec) {
+                    const hit = ticket.filter(n => resultNums.includes(n)).length;
+                    if (hit >=0 && hit<=6) singleHitDist[hit]++;
+                    singleTotal++;
                 }
             } else if (mode === 'replica') {
-                const recNumbers = pred.rec;
-                const hitCount = recNumbers.filter(n => resultNums.includes(n)).length;
-                if (hitCount >= 0 && hitCount <= 6) replicaHitDist[hitCount]++;
-                replicaTotalDraws++;
+                const recNums = p.rec;
+                const hit = recNums.filter(n => resultNums.includes(n)).length;
+                if (hit>=0 && hit<=6) replicaHitDist[hit]++;
+                replicaTotal++;
             } else if (mode === 'dantuo') {
-                const { dan, tuo } = pred.rec;
+                const { dan, tuo } = p.rec;
                 const danHit = dan.filter(n => resultNums.includes(n)).length;
                 const tuoHit = tuo.filter(n => resultNums.includes(n)).length;
-                if (danHit >= 0 && danHit <= 2) danHitDist[danHit]++;
-                if (tuoHit >= 0 && tuoHit <= 6) tuoHitDist[tuoHit]++;
-                dantuoTotalDraws++;
+                if (danHit>=0 && danHit<=2) danHitDist[danHit]++;
+                if (tuoHit>=0 && tuoHit<=6) tuoHitDist[tuoHit]++;
+                dantuoTotal++;
             }
         }
-
-        return {
-            single: { hitDist: singleHitDist, totalTickets: singleTotalTickets, atLeast3: singleAtLeast3 },
-            replica: { hitDist: replicaHitDist, totalDraws: replicaTotalDraws },
-            dantuo: { danHitDist, tuoHitDist, totalDraws: dantuoTotalDraws }
-        };
+        return { single: { dist: singleHitDist, total: singleTotal }, replica: { dist: replicaHitDist, total: replicaTotal }, dantuo: { danDist: danHitDist, tuoDist: tuoHitDist, total: dantuoTotal } };
     }
 
-    // 渲染結果
     function renderStats(stats) {
         const single = stats.single;
         const replica = stats.replica;
         const dantuo = stats.dantuo;
 
-        const singleHitRate = single.totalTickets ? (single.atLeast3 / single.totalTickets * 100).toFixed(2) : '0';
-        // 確保百分比也有7個元素
-        const singleHitDistPercent = single.hitDist.map(c => single.totalTickets ? (c / single.totalTickets * 100).toFixed(1) : '0');
+        const singleRate3Plus = single.total ? (single.dist.slice(3).reduce((a,b)=>a+b,0) / single.total * 100).toFixed(2) : '0';
+        const singlePercent = single.dist.map(c => single.total ? (c / single.total * 100).toFixed(1) : '0');
 
-        const replicaAvgHit = replica.totalDraws ? (replica.hitDist.reduce((sum, cnt, i) => sum + cnt * i, 0) / replica.totalDraws).toFixed(2) : '0';
-        const replicaAtLeast3 = replica.hitDist.slice(3).reduce((a,b)=>a+b,0);
-        const replicaAtLeast3Percent = replica.totalDraws ? (replicaAtLeast3 / replica.totalDraws * 100).toFixed(2) : '0';
+        const replicaAvgHit = replica.total ? (replica.dist.reduce((s,c,i)=>s+c*i,0) / replica.total).toFixed(2) : '0';
+        const replicaAtLeast3 = replica.dist.slice(3).reduce((a,b)=>a+b,0);
+        const replicaRate3Plus = replica.total ? (replicaAtLeast3 / replica.total * 100).toFixed(2) : '0';
 
-        const danAvgHit = dantuo.totalDraws ? (dantuo.danHitDist.reduce((sum, cnt, i) => sum + cnt * i, 0) / dantuo.totalDraws).toFixed(2) : '0';
-        const tuoAvgHit = dantuo.totalDraws ? (dantuo.tuoHitDist.reduce((sum, cnt, i) => sum + cnt * i, 0) / dantuo.totalDraws).toFixed(2) : '0';
-        const danHitAtLeast1 = dantuo.danHitDist.slice(1).reduce((a,b)=>a+b,0);
-        const danHitAtLeast1Percent = dantuo.totalDraws ? (danHitAtLeast1 / dantuo.totalDraws * 100).toFixed(2) : '0';
+        const danAvgHit = dantuo.total ? (dantuo.danDist.reduce((s,c,i)=>s+c*i,0) / dantuo.total).toFixed(2) : '0';
+        const tuoAvgHit = dantuo.total ? (dantuo.tuoDist.reduce((s,c,i)=>s+c*i,0) / dantuo.total).toFixed(2) : '0';
+        const danAtLeast1 = dantuo.danDist.slice(1).reduce((a,b)=>a+b,0);
+        const danRate1Plus = dantuo.total ? (danAtLeast1 / dantuo.total * 100).toFixed(2) : '0';
 
         const html = `
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>📌 單式 (用戶生成注)</h3>
-                    <p>總注數：<strong>${single.totalTickets}</strong></p>
-                    <p>🎯 至少中3個號碼的注數比例：<span class="metric">${singleHitRate}%</span></p>
-                    <table>
-                        <thead><tr><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
-                        <tbody>
-                            <tr>${single.hitDist.map(c => `<td>${c}</td>`).join('')}</tr>
-                            <tr>${singleHitDistPercent.map(p => `<td>${p}%</td>`).join('')}</tr>
-                        </tbody>
-                    </table>
-                    <div class="info-note">註：每注命中3個以上即為有獎（七獎$40）</div>
-                </div>
-                <div class="stat-card">
-                    <h3>🔢 複式 (推薦N碼)</h3>
-                    <p>總生成次數：<strong>${replica.totalDraws}</strong></p>
-                    <p>📊 平均包含中獎號碼數：<span class="metric">${replicaAvgHit}</span> / 6</p>
-                    <p>🎯 包含至少3個中獎號碼的比例：<span class="metric">${replicaAtLeast3Percent}%</span></p>
-                    <canvas id="replicaChart"></canvas>
-                </div>
-                <div class="stat-card">
-                    <h3>🎯 膽拖</h3>
-                    <p>總生成次數：<strong>${dantuo.totalDraws}</strong></p>
-                    <p>🎯 膽碼平均命中數：<span class="metric">${danAvgHit}</span> / 2 &nbsp;| 膽碼命中≥1的比例：${danHitAtLeast1Percent}%</p>
-                    <p>🎲 拖碼平均命中數：<span class="metric">${tuoAvgHit}</span> / 6</p>
-                    <canvas id="dantuoChart"></canvas>
-                </div>
+            <!-- 單式 -->
+            <div class="card">
+                <h3>📌 單式 (用戶生成注)</h3>
+                <p>總注數：<strong>${single.total}</strong> &nbsp; | &nbsp; 🎯 至少中3個號碼的比例：<span class="metric">${singleRate3Plus}%</span></p>
+                <table>
+                    <thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>注數</strong></td>${single.dist.map(c => `<td>${c}</td>`).join('')}</tr>
+                        <tr><td><strong>百分比</strong></td>${singlePercent.map(p => `<td>${p}%</td>`).join('')}</tr>
+                    </tbody>
+                </table>
+                <div class="info-note">註：每注命中3個以上即為有獎（七獎$40）</div>
+            </div>
+
+            <!-- 複式 -->
+            <div class="card">
+                <h3>🔢 複式 (推薦N碼)</h3>
+                <p>總生成次數：<strong>${replica.total}</strong> &nbsp; | &nbsp; 📊 平均包含中獎號碼數：<span class="metric">${replicaAvgHit}</span> / 6 &nbsp; | &nbsp; 🎯 包含至少3個中獎號碼的比例：<span class="metric">${replicaRate3Plus}%</span></p>
+                <table>
+                    <thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
+                    <tbody><tr>${replica.dist.map(c => `<td>${c}</td>`).join('')}</tr></tbody>
+                </table>
+                <canvas id="replicaChart"></canvas>
+            </div>
+
+            <!-- 膽拖 -->
+            <div class="card">
+                <h3>🎯 膽拖</h3>
+                <p>總生成次數：<strong>${dantuo.total}</strong></p>
+                <p>🎯 膽碼平均命中數：<span class="metric">${danAvgHit}</span> / 2 &nbsp; | &nbsp; 膽碼命中≥1的比例：${danRate1Plus}%</p>
+                <p>🎲 拖碼平均命中數：<span class="metric">${tuoAvgHit}</span> / 6</p>
+                <table>
+                    <thead><tr><th>膽碼命中</th><th>0</th><th>1</th><th>2</th></tr></thead>
+                    <tbody><tr>${dantuo.danDist.map(c => `<td>${c}</td>`).join('')}</tr></tbody>
+                </table>
+                <table style="margin-top:12px">
+                    <thead><tr><th>拖碼命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
+                    <tbody><tr>${dantuo.tuoDist.map(c => `<td>${c}</td>`).join('')}</tr></tbody>
+                </table>
+                <canvas id="dantuoChart"></canvas>
             </div>
             <div class="info-note">✅ 統計基於 ${predictions.length} 筆用戶預測記錄（匹配到開獎結果）。更新時間：${new Date().toLocaleString()}</div>
         `;
         document.getElementById('accuracyContent').innerHTML = html;
         document.getElementById('updateTime').innerText = `最後更新：${new Date().toLocaleString()}`;
 
-        if (replica.totalDraws) {
+        if (replica.total) {
             new Chart(document.getElementById('replicaChart'), {
-                type: 'bar', data: { labels: ['0','1','2','3','4','5','6'], datasets: [{ label: '次數', data: replica.hitDist, backgroundColor: '#3b82f6' }] },
-                options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+                type: 'bar', data: { labels: ['0','1','2','3','4','5','6'], datasets: [{ label: '次數', data: replica.dist, backgroundColor: '#3b82f6' }] },
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, title: { display: true, text: '期數' } }, x: { title: { display: true, text: '命中正碼個數' } } } }
             });
         }
-        if (dantuo.totalDraws) {
+        if (dantuo.total) {
             new Chart(document.getElementById('dantuoChart'), {
-                type: 'bar', data: { labels: ['0','1','2'], datasets: [{ label: '膽碼命中次數', data: dantuo.danHitDist, backgroundColor: '#f97316' }, { label: '拖碼命中次數 (0~6)', data: dantuo.tuoHitDist, backgroundColor: '#10b981' }] },
-                options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } }
+                type: 'bar', data: { labels: ['0','1','2'], datasets: [{ label: '膽碼命中', data: dantuo.danDist, backgroundColor: '#f97316' }, { label: '拖碼命中 (0~6)', data: dantuo.tuoDist, backgroundColor: '#10b981' }] },
+                options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true, title: { display: true, text: '次數' } } } }
             });
         }
     }
 
-    // 主流程
     async function init() {
         try {
             await loadResults();
             await loadPredictions();
-            if (predictions.length === 0) {
-                document.getElementById('accuracyContent').innerHTML = `<div class="card error-box">⚠️ 沒有找到可匹配的預測記錄。請確認預測表中的 Issue Key 格式與開獎表一致，且對應期數已開獎。</div>`;
-                return;
-            }
+            if (predictions.length === 0) throw new Error("沒有可匹配的預測記錄");
             const stats = computeStats();
             renderStats(stats);
         } catch (err) {
-            console.error(err);
             document.getElementById('accuracyContent').innerHTML = `<div class="card error-box">❌ 分析失敗：${err.message}</div>`;
         }
     }
