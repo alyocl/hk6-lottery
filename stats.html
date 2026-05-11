@@ -346,7 +346,7 @@ function getBlindNumbers(data, maxDraws = 180) {
         const lastDigitDist = getLastDigitStats(data);
         const colorStats = getColorStats(data);
         const totalNumbers = totalDraws * 6;
-        const blindNumbers = getBlindNumbers(freqAll);
+        const blindNumbers = getBlindNumbers(data, 180);  // 明確指定最近180期
 
         // 熱冷號 (基於最近20期)
         let numbers = Array.from({length:49}, (_,i)=>i+1);
