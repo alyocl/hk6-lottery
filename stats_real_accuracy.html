@@ -139,21 +139,20 @@
         const replica = stats.replica;
         const dantuo = stats.dantuo;
 
-        // 強制將陣列長度補到 7 (0-6)
-        function padTo7(arr) {
-            const padded = [...arr];
-            while (padded.length < 7) padded.push(0);
-            return padded.slice(0,7);
+        // 確保每個分佈都有足夠長度 (0-6 共7個, 膽0-2共3個)
+        function ensure7(arr) {
+            let a = [...arr];
+            while (a.length < 7) a.push(0);
+            return a.slice(0,7);
         }
-        function padTo3(arr) {
-            const padded = [...arr];
-            while (padded.length < 3) padded.push(0);
-            return padded.slice(0,3);
+        function ensure3(arr) {
+            let a = [...arr];
+            while (a.length < 3) a.push(0);
+            return a.slice(0,3);
         }
-
-        const replicaDist = padTo7(replica.dist);
-        const tuoDist = padTo7(dantuo.tuoDist);
-        const danDist = padTo3(dantuo.danDist);
+        const replicaDist = ensure7(replica.dist);
+        const tuoDist = ensure7(dantuo.tuoDist);
+        const danDist = ensure3(dantuo.danDist);
 
         const singleRate3Plus = single.total ? (single.dist.slice(3).reduce((a,b)=>a+b,0) / single.total * 100).toFixed(2) : '0';
         const singlePercent = single.dist.map(c => single.total ? (c / single.total * 100).toFixed(1) : '0');
@@ -167,43 +166,26 @@
         const danAtLeast1 = danDist.slice(1).reduce((a,b)=>a+b,0);
         const danRate1Plus = dantuo.total ? (danAtLeast1 / dantuo.total * 100).toFixed(2) : '0';
 
-        // --- 修正重點：使用標準 <tr> 包住每一行資料，確保表格完整 ---
-        const replicaTableRows = `
-            <tr>${replicaDist.map(v => `<td>${v}</td>`).join('')}</tr>
-        `;
-        const tuoTableRows = `
-            <tr>${tuoDist.map(v => `<td>${v}</td>`).join('')}</tr>
-        `;
-        const danTableRows = `
-            <tr>${danDist.map(v => `<td>${v}</td>`).join('')}</tr>
-        `;
+        // 人手建立表格列（確保7格）
+        const replicaRow = `<tr>${replicaDist.map(v => `<td>${v}</td>`).join('')}</tr>`;
+        const tuoRow = `<tr>${tuoDist.map(v => `<td>${v}</td>`).join('')}</tr>`;
+        const danRow = `<tr>${danDist.map(v => `<td>${v}</td>`).join('')}</tr>`;
 
         const html = `
             <div class="card">
                 <h3>📌 單式 (用戶生成注)</h3>
                 <p>總注數：<strong>${single.total}</strong> &nbsp; | &nbsp; 🎯 至少中3個號碼的比例：<span class="metric">${singleRate3Plus}%</span></p>
-                <table>
-                    <thead>
-                        <tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr><td><strong>注數</strong></td>${single.dist.map(c => `<td>${c}</td>`).join('')}</tr>
-                        <tr><td><strong>百分比</strong></td>${singlePercent.map(p => `<td>${p}%</td>`).join('')}</tr>
-                    </tbody>
+                <table><thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
+                <tbody><tr><td><strong>注數</strong></td>${single.dist.map(c => `<td>${c}</td>`).join('')}</tr>
+                <tr><td><strong>百分比</strong></td>${singlePercent.map(p => `<td>${p}%</td>`).join('')}</tr></tbody>
                 </table>
                 <div class="info-note">註：每注命中3個以上即為有獎（七獎$40）</div>
             </div>
             <div class="card">
                 <h3>🔢 複式 (推薦N碼)</h3>
                 <p>總生成次數：<strong>${replica.total}</strong> &nbsp; | &nbsp; 📊 平均包含中獎號碼數：<span class="metric">${replicaAvgHit}</span> / 6 &nbsp; | &nbsp; 🎯 包含至少3個中獎號碼的比例：<span class="metric">${replicaRate3Plus}%</span></p>
-                <table>
-                    <thead>
-                        <tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>
-                    </thead>
-                    <tbody>
-                        ${replicaTableRows}
-                    </tbody>
-                </table>
+                <table><thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
+                <tbody>${replicaRow}</tbody></table>
                 <canvas id="replicaChart"></canvas>
             </div>
             <div class="card">
@@ -211,22 +193,10 @@
                 <p>總生成次數：<strong>${dantuo.total}</strong></p>
                 <p>🎯 膽碼平均命中數：<span class="metric">${danAvgHit}</span> / 2 &nbsp; | &nbsp; 膽碼命中≥1的比例：${danRate1Plus}%</p>
                 <p>🎲 拖碼平均命中數：<span class="metric">${tuoAvgHit}</span> / 6</p>
-                <table>
-                    <thead>
-                        <tr><th>膽碼命中</th><th>0</th><th>1</th><th>2</th></tr>
-                    </thead>
-                    <tbody>
-                        ${danTableRows}
-                    </tbody>
-                </table>
-                <table style="margin-top:12px">
-                    <thead>
-                        <tr><th>拖碼命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>
-                    </thead>
-                    <tbody>
-                        ${tuoTableRows}
-                    </tbody>
-                </table>
+                <table><thead><tr><th>膽碼命中</th><th>0</th><th>1</th><th>2</th></tr></thead>
+                <tbody>${danRow}</tbody></table>
+                <table style="margin-top:12px"><thead><tr><th>拖碼命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
+                <tbody>${tuoRow}</tbody></table>
                 <canvas id="dantuoChart"></canvas>
             </div>
             <div class="info-note">✅ 統計基於 ${predictions.length} 筆用戶預測記錄（匹配到開獎結果）。更新時間：${new Date().toLocaleString()}</div>
