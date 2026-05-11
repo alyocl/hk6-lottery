@@ -1,6 +1,8 @@
 # 允許所有搜尋引擎爬取所有內容
 User-agent: *
 Allow: /
+Disallow: /wrangler.jsonc
+Disallow: /backup/
 
 # 指定 Sitemap 位置
 Sitemap: https://hk6.netlify.app/sitemap.xml
