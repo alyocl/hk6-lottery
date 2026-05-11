@@ -298,9 +298,10 @@
     </div>
 
     <div class="footer-links">
-        <a href="/about.html">關於我們</a> | 
-        <a href="/privacy.html">私隱政策</a>
-    </div>
+    <a href="/about.html">關於我們</a> | 
+    <a href="/privacy.html">私隱政策</a> |
+    <a href="/stat.html">📊 數據統計</a>
+</div>
     
     <div class="footer-note">
         ✅ 生成預測後會獲得核對碼，同一期內相同玩法不會重複生成
@@ -575,7 +576,7 @@ async function renderSingle() {
                     <span class="number-ball ${getBallClass(latest.special)}">${latest.special}</span>
                 </div>
             </div>
-            <div><strong>📜 最近5期 (最新在上)</strong><br>${recentHtml}</div>
+            <div><strong>📜 最近5期 </strong><br>${recentHtml}</div>
         </div>
         <div class="bet-selector">
             <label>🎲 選擇注數：</label>
@@ -674,7 +675,7 @@ async function renderDanTuo() {
     }
     
     let danOptions = "";
-    for (let i = 1; i <= 5; i++) danOptions += `<option value="${i}">${i} 個膽碼</option>`;
+    for (let i = 1; i <= 5; i++) danOptions += `<option value="${i}">${i} 個膽</option>`;
     
     const html = `
         <div class="card">
