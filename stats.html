@@ -236,13 +236,20 @@
     }
 
     // 盲門：從未出現的號碼（根據正碼頻率）
-    function getBlindNumbers(freqAll) {
-        let blind = [];
-        for (let i = 1; i <= 49; i++) {
-            if (freqAll[i] === 0) blind.push(i);
-        }
-        return blind;
+// 盲門：從未出現的號碼（基於最近 maxDraws 期，預設 180）
+function getBlindNumbers(data, maxDraws = 180) {
+    const limitedData = data.slice(0, Math.min(maxDraws, data.length));
+    const freq = new Array(50).fill(0);
+    for (let row of limitedData) {
+        freq[row.n1]++; freq[row.n2]++; freq[row.n3]++;
+        freq[row.n4]++; freq[row.n5]++; freq[row.n6]++;
     }
+    let blind = [];
+    for (let i = 1; i <= 49; i++) {
+        if (freq[i] === 0) blind.push(i);
+    }
+    return blind;
+}
 
     // 其他統計函數 (奇偶、大小、和值、區間、連號、尾數、顏色)
     function getOddEvenStats(data) {
