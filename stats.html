@@ -373,11 +373,11 @@ function getBlindNumbers(data, maxDraws = 180) {
                     <div class="number-list">
                         ${coldNumbers.map(n => `<span class="number-badge cold">${n}</span>`).join('')}
                     </div>
-                    <h3 style="margin-top: 1rem;">🚪 盲門 (從未開出正碼)</h3>
+                    <h3 style="margin-top: 1rem;">🚪 盲門 (近180期未開出（不包括特別號碼）)</h3>
                     <div class="number-list">
                         ${blindNumbers.length ? blindNumbers.map(n => `<span class="number-badge blind">${n}</span>`).join('') : '<span>無盲門號碼</span>'}
                     </div>
-                    <div class="info-note">熱號=出現最多；冷號=出現最少；盲門=歷史正碼從未出現</div>
+                    <div class="info-note">熱號=出現最多；冷號=出現最少；盲門=最近180期未開出（不包括特別號碼）</div>
                 </div>
 
                 <!-- 整體頻率 TOP15 -->
