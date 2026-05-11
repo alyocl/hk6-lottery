@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>推薦統計 | 六合彩 AI 分析系統</title>
+    <title>六合彩 AI 分析系統 - 數據統計</title>
     <style>
         * {
             box-sizing: border-box;
@@ -32,208 +32,453 @@
             box-shadow: 0 8px 20px rgba(0,0,0,0.1);
         }
         h1 {
+            margin: 0 0 0.25rem 0;
+            font-size: 1.8rem;
             color: #0f172a;
-            margin-top: 0;
-        }
-        h2 {
-            color: #f97316;
-            font-size: 1.3rem;
-            margin-top: 0;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-        }
-        th, td {
-            text-align: left;
-            padding: 8px 6px;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        th {
-            background-color: #f1f5f9;
-            font-weight: 600;
-        }
-        .stat-grid {
             display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
+            align-items: center;
+            gap: 8px;
+        }
+        .badge {
+            background: #10b981;
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 40px;
+        }
+        .sub {
+            color: #475569;
+            font-size: 0.85rem;
+            border-left: 3px solid #f97316;
+            padding-left: 0.75rem;
+            margin-top: 6px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
         }
         .stat-card {
             background: #f8fafc;
             border-radius: 1rem;
             padding: 1rem;
-            flex: 1;
-            min-width: 150px;
-            text-align: center;
-            border-left: 4px solid #f97316;
+            border: 1px solid #e2e8f0;
         }
-        .stat-number {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #f97316;
-        }
-        .back-link {
+        .stat-card h3 {
+            margin-top: 0;
+            color: #0f172a;
+            border-bottom: 2px solid #f97316;
             display: inline-block;
+            padding-bottom: 4px;
+        }
+        .number-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .number-badge {
+            display: inline-block;
+            width: 38px;
+            height: 38px;
+            line-height: 38px;
+            text-align: center;
+            border-radius: 40px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        .hot { background-color: #dc2626; color: white; }
+        .warm { background-color: #f97316; color: white; }
+        .cold { background-color: #3b82f6; color: white; }
+        .neutral { background-color: #cbd5e1; color: #1e293b; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px;
+            text-align: center;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background-color: #f1f5f9;
+        }
+        .footer-links {
+            text-align: center;
             margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+        .footer-links a {
             color: #f97316;
             text-decoration: none;
+            margin: 0 10px;
+            font-size: 0.8rem;
         }
-        .back-link:hover {
-            text-decoration: underline;
+        canvas {
+            max-height: 300px;
+            width: 100%;
         }
-        .footer {
+        .loading {
             text-align: center;
-            margin-top: 2rem;
-            color: #94a3b8;
+            padding: 2rem;
+            color: #475569;
+        }
+        .error-box {
+            background: #fee2e2;
+            border-radius: 1rem;
+            padding: 1rem;
+            text-align: center;
+            color: #dc2626;
+        }
+        .info-note {
             font-size: 0.75rem;
+            color: #475569;
+            margin-top: 8px;
+            text-align: center;
         }
-        .export-btn {
-            background-color: #f97316;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 50px;
-            cursor: pointer;
-            font-weight: 500;
-            margin-bottom: 1rem;
-            float: right;
-        }
-        .export-btn:hover {
-            background-color: #ea580c;
-        }
-        @media (max-width: 768px) {
-            th, td {
-                font-size: 0.7rem;
-                padding: 4px;
-            }
+        @media (max-width: 640px) {
+            .number-badge { width: 32px; height: 32px; line-height: 32px; font-size: 0.8rem; }
         }
     </style>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Google Sheets API 不需要额外库，直接用 fetch -->
 </head>
 <body>
 <div class="container">
     <div class="card">
-        <h1>📊 全域推薦統計</h1>
-        <p>此頁面統計所有透過表單收集的推薦記錄（唯讀）。</p>
-        <a href="/" class="back-link">← 返回首頁</a>
-        <button id="exportStatsBtn" class="export-btn">📎 匯出 CSV</button>
+        <h1>📊 六合彩統計分析 <span class="badge">基於歷史數據</span></h1>
+        <div class="sub">數據來源：香港賽馬會 (自動同步) · 更新於開獎後</div>
     </div>
 
     <div id="statsContent">
-        <div class="card">正在載入統計資料...</div>
+        <div class="card loading">⏳ 載入歷史數據中，請稍候...</div>
     </div>
-    <div class="footer">
-        🔞 博彩要有節制 | 未滿十八歲人士不得投注 | 切勿沉迷賭博
+
+    <div class="footer-links">
+        <a href="/">← 返回預測系統</a> | 
+        <a href="/about.html">關於我們</a> | 
+        <a href="/privacy.html">私隱政策</a>
     </div>
 </div>
 
 <script>
-    // ========== 設定區 ==========
-     const API_KEY = 'AIzaSyCmpR7qGwgfE3y7XIS-O1_cny_iBsDa7No';
-    const SPREADSHEET_ID = '1ddt9iUMO4FYqJI5_mnoSU5LmgcFW8XKeI043UPY-iKk';   // ✅ 已更新
-    const RANGE = 'Form Responses 1!A:F';   // 请根据您的工作表名称调整
-    // ===========================
+    // ==================== 設定 ====================
+    const API_KEY = 'AIzaSyCmpR7qGwgfE3y7XIS-O1_cny_iBsDa7No';
+    const SPREADSHEET_ID = '1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw';
+    const RANGE = 'sheet1!A:H';  // A:期號, B~G: n1~n6, H: special
 
-    async function loadAllRecommendations() {
+    let rawData = [];       // 儲存所有期數的 { issue, n1..n6, special }
+
+    // ==================== 讀取 Google Sheets ====================
+    async function loadData() {
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${RANGE}?key=${API_KEY}`;
         try {
-            const response = await fetch(url);
+            const response = await fetch(url, { cache: "no-store" });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
-            if (!data.values || data.values.length < 2) return [];
-            const headers = data.values[0];
-            const colCode = headers.indexOf('Check Code');
-            const colMode = headers.indexOf('Mode');
-            const colParams = headers.indexOf('Params');
-            const colRec = headers.indexOf('Recommendations');
-            const colIssue = headers.indexOf('Issue Key');
-            const colTimestamp = 0; // 第一列是時間戳
+            if (!data.values || data.values.length < 2) throw new Error("無數據");
             const records = [];
             for (let i = 1; i < data.values.length; i++) {
                 const row = data.values[i];
-                records.push({
-                    timestamp: row[colTimestamp],
-                    code: row[colCode],
-                    mode: row[colMode],
-                    params: row[colParams] ? JSON.parse(row[colParams]) : {},
-                    recommendations: row[colRec] ? JSON.parse(row[colRec]) : [],
-                    issueKey: row[colIssue]
-                });
+                if (row.length < 8) continue;
+                const issue = row[0].trim();
+                const n1 = parseInt(row[1], 10);
+                const n2 = parseInt(row[2], 10);
+                const n3 = parseInt(row[3], 10);
+                const n4 = parseInt(row[4], 10);
+                const n5 = parseInt(row[5], 10);
+                const n6 = parseInt(row[6], 10);
+                const special = parseInt(row[7], 10);
+                if (isNaN(n1) || isNaN(n2) || isNaN(n3) || isNaN(n4) || isNaN(n5) || isNaN(n6) || isNaN(special)) continue;
+                records.push({ issue, n1, n2, n3, n4, n5, n6, special });
             }
+            if (records.length === 0) throw new Error("無有效號碼");
+            console.log(`載入 ${records.length} 期數據`);
             return records;
         } catch (err) {
-            console.error('讀取失敗:', err);
-            return [];
+            console.error(err);
+            return null;
         }
     }
 
-    function exportToCSV(records) {
-        if (!records.length) return;
-        const headers = ['時間戳', '核對碼', '玩法', '參數', '推薦號碼', '期號'];
-        const rows = records.map(r => [
-            r.timestamp,
-            r.code,
-            r.mode,
-            JSON.stringify(r.params),
-            JSON.stringify(r.recommendations),
-            r.issueKey
-        ]);
-        const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.href = url;
-        link.setAttribute('download', 'lottery_recommendations.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+    // ==================== 統計分析函數 ====================
+    // 獲取所有正碼 (不含特別號)
+    function getAllMainNumbers(data) {
+        let nums = [];
+        for (let row of data) {
+            nums.push(row.n1, row.n2, row.n3, row.n4, row.n5, row.n6);
+        }
+        return nums;
     }
 
-    async function renderStats() {
-        document.getElementById('statsContent').innerHTML = '<div class="card">📡 載入中...</div>';
-        const records = await loadAllRecommendations();
-        if (records.length === 0) {
-            document.getElementById('statsContent').innerHTML = '<div class="card">📭 暫無推薦記錄。</div>';
+    // 計算每個號碼出現次數 (1-49)
+    function getFrequency(data) {
+        const freq = new Array(50).fill(0);
+        for (let row of data) {
+            freq[row.n1]++;
+            freq[row.n2]++;
+            freq[row.n3]++;
+            freq[row.n4]++;
+            freq[row.n5]++;
+            freq[row.n6]++;
+        }
+        return freq;
+    }
+
+    // 最近 N 期頻率 (用於熱冷號)
+    function getRecentFrequency(data, lastN) {
+        const recent = data.slice(0, lastN);
+        const freq = new Array(50).fill(0);
+        for (let row of recent) {
+            freq[row.n1]++;
+            freq[row.n2]++;
+            freq[row.n3]++;
+            freq[row.n4]++;
+            freq[row.n5]++;
+            freq[row.n6]++;
+        }
+        return freq;
+    }
+
+    // 奇偶統計 (每期正碼)
+    function getOddEvenStats(data) {
+        let oddCounts = [];
+        for (let row of data) {
+            const numbers = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6];
+            const odd = numbers.filter(n => n % 2 === 1).length;
+            oddCounts.push(odd);
+        }
+        // 統計奇數個數的分佈 (0~6)
+        const dist = new Array(7).fill(0);
+        for (let cnt of oddCounts) dist[cnt]++;
+        return dist;
+    }
+
+    // 大小統計 (>=25 為大)
+    function getBigSmallStats(data) {
+        let bigCounts = [];
+        for (let row of data) {
+            const numbers = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6];
+            const big = numbers.filter(n => n >= 25).length;
+            bigCounts.push(big);
+        }
+        const dist = new Array(7).fill(0);
+        for (let cnt of bigCounts) dist[cnt]++;
+        return dist;
+    }
+
+    // 和值統計
+    function getSumStats(data) {
+        let sums = [];
+        for (let row of data) {
+            const sum = row.n1 + row.n2 + row.n3 + row.n4 + row.n5 + row.n6;
+            sums.push(sum);
+        }
+        return sums;
+    }
+
+    // 區間分佈 (1-10,11-20,21-30,31-40,41-49)
+    function getRangeStats(data) {
+        const ranges = [0,0,0,0,0]; // 索引0對應1-10,1:11-20,2:21-30,3:31-40,4:41-49
+        for (let row of data) {
+            const nums = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6];
+            for (let n of nums) {
+                if (n <= 10) ranges[0]++;
+                else if (n <= 20) ranges[1]++;
+                else if (n <= 30) ranges[2]++;
+                else if (n <= 40) ranges[3]++;
+                else ranges[4]++;
+            }
+        }
+        return ranges;
+    }
+
+    // 連號統計（例如 9,10 這種連續兩個號碼）
+    function getConsecutiveStats(data) {
+        let consecutivePairs = 0;
+        let consecutiveTriplets = 0;
+        for (let row of data) {
+            const nums = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6].sort((a,b)=>a-b);
+            for (let i = 0; i < nums.length-1; i++) {
+                if (nums[i+1] - nums[i] === 1) {
+                    consecutivePairs++;
+                    // 檢查是否三個連續
+                    if (i+2 < nums.length && nums[i+2] - nums[i+1] === 1) consecutiveTriplets++;
+                }
+            }
+        }
+        return { pairs: consecutivePairs, triplets: consecutiveTriplets, totalDraws: data.length };
+    }
+
+    // 尾數分佈 (0-9)
+    function getLastDigitStats(data) {
+        const digits = new Array(10).fill(0);
+        for (let row of data) {
+            const nums = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6];
+            for (let n of nums) {
+                const last = n % 10;
+                digits[last]++;
+            }
+        }
+        return digits;
+    }
+
+    // ==================== 渲染 UI ====================
+    function renderStats(data) {
+        const totalDraws = data.length;
+        const freqAll = getFrequency(data);
+        const recentFreq = getRecentFrequency(data, Math.min(20, totalDraws));
+        const oddEvenDist = getOddEvenStats(data);
+        const bigSmallDist = getBigSmallStats(data);
+        const sums = getSumStats(data);
+        const rangeDist = getRangeStats(data);
+        const consecutive = getConsecutiveStats(data);
+        const lastDigitDist = getLastDigitStats(data);
+
+        // 準備熱冷號列表 (基於最近20期，每個號碼出現次數)
+        // 將1-49按最近頻率排序，取前10為熱號，後10為冷號
+        let numbers = Array.from({length:49}, (_,i)=>i+1);
+        numbers.sort((a,b) => recentFreq[b] - recentFreq[a]);
+        const hotNumbers = numbers.slice(0, 10);
+        const coldNumbers = numbers.slice(-10).reverse();
+
+        // 計算平均和值、中位數等
+        const avgSum = (sums.reduce((a,b)=>a+b,0) / sums.length).toFixed(1);
+        sums.sort((a,b)=>a-b);
+        const medianSum = sums[Math.floor(sums.length/2)];
+        const minSum = sums[0];
+        const maxSum = sums[sums.length-1];
+
+        // 頻率表 (前10熱門)
+        const topFreq = numbers.slice(0, 15).map(n => ({ num: n, count: freqAll[n] }));
+
+        // 構建 HTML
+        let html = `
+            <div class="stats-grid">
+                <!-- 熱門號碼 & 冷門號碼 -->
+                <div class="stat-card">
+                    <h3>🔥 近期熱號 (最近20期)</h3>
+                    <div class="number-list">
+                        ${hotNumbers.map(n => `<span class="number-badge hot">${n}</span>`).join('')}
+                    </div>
+                    <h3 style="margin-top: 1rem;">❄️ 近期冷號 (最近20期)</h3>
+                    <div class="number-list">
+                        ${coldNumbers.map(n => `<span class="number-badge cold">${n}</span>`).join('')}
+                    </div>
+                    <div class="info-note">註：熱號 = 出現次數最多；冷號 = 出現次數最少 (平局按號碼排序)</div>
+                </div>
+
+                <!-- 整體頻率 TOP15 -->
+                <div class="stat-card">
+                    <h3>📈 歷史總出現次數 TOP15</h3>
+                    <table>
+                        <thead><tr><th>號碼</th><th>次數</th><th>出現率</th></tr></thead>
+                        <tbody>
+                            ${topFreq.map(item => `<tr><td><strong>${item.num}</strong></td><td>${item.count}</td><td>${(item.count/(totalDraws*6)*100).toFixed(1)}%</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 奇偶比例分佈 -->
+                <div class="stat-card">
+                    <h3>⚖️ 奇偶比例分佈</h3>
+                    <canvas id="oddEvenChart" width="400" height="200"></canvas>
+                    <div class="info-note">顯示每期奇數個數的出現次數 (0~6)</div>
+                </div>
+
+                <!-- 大小比例分佈 -->
+                <div class="stat-card">
+                    <h3>📏 大小比例分佈 (≥25為大)</h3>
+                    <canvas id="bigSmallChart" width="400" height="200"></canvas>
+                    <div class="info-note">顯示每期大號個數的出現次數</div>
+                </div>
+
+                <!-- 和值統計 -->
+                <div class="stat-card">
+                    <h3>➕ 和值統計</h3>
+                    <canvas id="sumHistogram" width="400" height="200"></canvas>
+                    <div>📊 平均和值: ${avgSum} &nbsp;| 中位數: ${medianSum} &nbsp;| 範圍: ${minSum} ~ ${maxSum}</div>
+                </div>
+
+                <!-- 區間分佈 -->
+                <div class="stat-card">
+                    <h3>📌 區間分佈 (1-10,11-20,21-30,31-40,41-49)</h3>
+                    <canvas id="rangeChart" width="400" height="200"></canvas>
+                </div>
+
+                <!-- 尾數分佈 -->
+                <div class="stat-card">
+                    <h3>🔢 尾數分佈 (0-9)</h3>
+                    <canvas id="lastDigitChart" width="400" height="200"></canvas>
+                </div>
+
+                <!-- 連號統計 -->
+                <div class="stat-card">
+                    <h3>🔗 連號統計</h3>
+                    <p>📊 在 ${totalDraws} 期中共出現 <strong>${consecutive.pairs}</strong> 組連號 (兩個連續號碼)</p>
+                    <p>📊 其中三連號出現 <strong>${consecutive.triplets}</strong> 次</p>
+                    <p>📈 平均每期約 ${(consecutive.pairs/totalDraws).toFixed(2)} 組連號</p>
+                </div>
+            </div>
+            <div class="info-note" style="margin-top: 1rem;">✅ 統計基於 ${totalDraws} 期開獎數據 (正碼，不含特別號)。更新於 ${new Date().toLocaleString()}</div>
+        `;
+        document.getElementById('statsContent').innerHTML = html;
+
+        // 繪製圖表
+        // 奇偶圖
+        new Chart(document.getElementById('oddEvenChart'), {
+            type: 'bar',
+            data: { labels: ['0奇','1奇','2奇','3奇','4奇','5奇','6奇'], datasets: [{ label: '期數', data: oddEvenDist, backgroundColor: '#f97316' }] },
+            options: { responsive: true, maintainAspectRatio: true }
+        });
+        // 大小圖
+        new Chart(document.getElementById('bigSmallChart'), {
+            type: 'bar',
+            data: { labels: ['0大','1大','2大','3大','4大','5大','6大'], datasets: [{ label: '期數', data: bigSmallDist, backgroundColor: '#3b82f6' }] },
+            options: { responsive: true }
+        });
+        // 和值直方圖 (分組)
+        const sumBins = [0,80,100,120,140,160,180,200];
+        const sumHist = new Array(sumBins.length-1).fill(0);
+        for (let s of sums) {
+            for (let i=0; i<sumBins.length-1; i++) {
+                if (s >= sumBins[i] && s < sumBins[i+1]) { sumHist[i]++; break; }
+                if (i === sumBins.length-2 && s >= sumBins[sumBins.length-1]) sumHist[sumHist.length-1]++;
+            }
+        }
+        const sumLabels = sumBins.slice(0,-1).map((v,i)=>`${v}-${sumBins[i+1]}`);
+        new Chart(document.getElementById('sumHistogram'), {
+            type: 'bar',
+            data: { labels: sumLabels, datasets: [{ label: '期數', data: sumHist, backgroundColor: '#10b981' }] },
+            options: { responsive: true }
+        });
+        // 區間圖
+        new Chart(document.getElementById('rangeChart'), {
+            type: 'bar',
+            data: { labels: ['1-10','11-20','21-30','31-40','41-49'], datasets: [{ label: '總出現次數', data: rangeDist, backgroundColor: '#8b5cf6' }] },
+            options: { responsive: true }
+        });
+        // 尾數圖
+        new Chart(document.getElementById('lastDigitChart'), {
+            type: 'bar',
+            data: { labels: ['0','1','2','3','4','5','6','7','8','9'], datasets: [{ label: '出現次數', data: lastDigitDist, backgroundColor: '#ec489a' }] },
+            options: { responsive: true }
+        });
+    }
+
+    // ==================== 初始化 ====================
+    async function init() {
+        const data = await loadData();
+        if (!data || data.length === 0) {
+            document.getElementById('statsContent').innerHTML = `<div class="card error-box">❌ 讀取數據失敗，請確認 Google Sheets 已公開且格式正確</div>`;
             return;
         }
-
-        // 統計摘要
-        const total = records.length;
-        const modeCount = { single:0, replica:0, dantuo:0 };
-        records.forEach(r => { modeCount[r.mode] = (modeCount[r.mode] || 0) + 1; });
-
-        let statsHtml = `
-            <div class="stat-grid">
-                <div class="stat-card"><div class="stat-number">${total}</div><div>總推薦數</div></div>
-                <div class="stat-card"><div class="stat-number">${modeCount.single || 0}</div><div>單式</div></div>
-                <div class="stat-card"><div class="stat-number">${modeCount.replica || 0}</div><div>複式</div></div>
-                <div class="stat-card"><div class="stat-number">${modeCount.dantuo || 0}</div><div>膽拖</div></div>
-            </div>
-            <div class="card">
-                <h2>📋 詳細記錄</h2>
-                <div style="overflow-x:auto;">
-                    <table id="detailTable">
-                        <thead><tr><th>時間</th><th>核對碼</th><th>玩法</th><th>參數</th><th>推薦號碼</th><th>期號</th></tr></thead>
-                        <tbody>
-        `;
-        records.slice().reverse().forEach(r => {
-            const recStr = JSON.stringify(r.recommendations);
-            statsHtml += `<tr>
-                <td>${new Date(r.timestamp).toLocaleString()}</td>
-                <td>${r.code}</td>
-                <td>${r.mode}</td>
-                <td>${JSON.stringify(r.params)}</td>
-                <td title="${recStr}">${recStr.substring(0, 50)}${recStr.length>50 ? '…' : ''}</td>
-                <td>${r.issueKey}</td>
-            </tr>`;
-        });
-        statsHtml += `</tbody></table></div></div>`;
-        document.getElementById('statsContent').innerHTML = statsHtml;
-        document.getElementById('exportStatsBtn').onclick = () => exportToCSV(records);
+        rawData = data;
+        renderStats(rawData);
     }
-
-    renderStats();
+    init();
 </script>
 </body>
 </html>
