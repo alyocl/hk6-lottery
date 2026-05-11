@@ -321,7 +321,7 @@
 // ==================== 全域常數與變數 ====================
 const API_KEY = 'AIzaSyCmpR7qGwgfE3y7XIS-O1_cny_iBsDa7No';
 const SPREADSHEET_ID = '1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw';
-const RANGE = 'sheet1!A:G';
+const RANGE = 'sheet1!A:H';  // A列:期號, B~G: n1~n6, H: special
 const MODEL_CONFIG = {
     lookback: 8,
     decay_lambda: 0.35,
@@ -334,7 +334,7 @@ let currentMode = "single";
 let checkRecords = {};
 let currentIssueKey = "";
 
-// ==================== 核對碼儲存函數 ====================
+// ==================== 核對碼儲存 ====================
 function loadCheckRecords() {
     const saved = localStorage.getItem('lottery_check_records');
     if (saved) {
@@ -357,16 +357,11 @@ function getIssueKey(dataSeries) {
     const latest = dataSeries[0];
     return `${latest.n1},${latest.n2},${latest.n3},${latest.n4},${latest.n5},${latest.n6}|${latest.special}`;
 }
-function getIssueNumber(index) {
-    let num = 47 - index;
-    if (num >= 1) return `26/${num.toString().padStart(3, '0')}`;
-    else return `期數_${index + 1}`;
+function getIssueNumber(record) {
+    return record.issue;
 }
 function savePrediction(mode, params, data) {
-    // 1. 首先声明变量
     let code, isNew;
-    
-    // 2. 原有逻辑：检查重复记录
     const existingEntry = Object.entries(checkRecords).find(([key, record]) => {
         return record.mode === mode && record.issue === currentIssueKey && JSON.stringify(record.params) === JSON.stringify(params);
     });
@@ -382,21 +377,16 @@ function savePrediction(mode, params, data) {
         saveCheckRecords();
         isNew = true;
     }
-
-    // 3. 新增：通过隐藏iframe提交到Google Form（必须放在code赋值之后）
     const FORM_ACTION = 'https://docs.google.com/forms/d/e/1FAIpQLSeYkeOO3JHFx7lIz-4YjF3yQ7eHUQHPh2QRQDleD0jnYS_mhQ/formResponse';
     const iframe = document.createElement('iframe');
     iframe.name = 'hidden-frame';
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
-
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = FORM_ACTION;
     form.target = 'hidden-frame';
     form.style.display = 'none';
-
-    // 使用您之前获取的entry ID
     const fieldMapping = {
         'entry.497469535': code,
         'entry.2130058932': mode,
@@ -404,7 +394,6 @@ function savePrediction(mode, params, data) {
         'entry.1578146059': JSON.stringify(data),
         'entry.1684128741': currentIssueKey
     };
-
     for (const [name, value] of Object.entries(fieldMapping)) {
         const input = document.createElement('input');
         input.type = 'text';
@@ -412,18 +401,15 @@ function savePrediction(mode, params, data) {
         input.value = value;
         form.appendChild(input);
     }
-
     document.body.appendChild(form);
     form.submit();
-
-    // 清理iframe和form
     setTimeout(() => {
         if (document.body.contains(iframe)) document.body.removeChild(iframe);
         if (document.body.contains(form)) document.body.removeChild(form);
     }, 3000);
-
     return { code: code, isNew: isNew };
 }
+
 // ==================== 號碼球顏色映射 ====================
 function getBallClass(num) {
     const red = [1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46];
@@ -435,7 +421,7 @@ function getBallClass(num) {
     return 'ball-gray';
 }
 
-// ==================== 讀取 Google Sheets 數據 ====================
+// ==================== 讀取 Google Sheets (修正：包含期號) ====================
 async function loadCsvData() {
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${RANGE}?key=${API_KEY}`;
     try {
@@ -447,30 +433,24 @@ async function loadCsvData() {
         }
         const data = await response.json();
         if (!data.values || data.values.length < 2) throw new Error("試算表中沒有數據");
-        const headers = data.values[0];
-        const n1Idx = headers.indexOf('n1'), n2Idx = headers.indexOf('n2'), n3Idx = headers.indexOf('n3');
-        const n4Idx = headers.indexOf('n4'), n5Idx = headers.indexOf('n5'), n6Idx = headers.indexOf('n6');
-        const specialIdx = headers.indexOf('special');
-        const useDefault = [n1Idx, n2Idx, n3Idx, n4Idx, n5Idx, n6Idx, specialIdx].some(i => i === -1);
-        let records = [];
+        const records = [];
         for (let i = 1; i < data.values.length; i++) {
             const row = data.values[i];
-            if (row.length < 7) continue;
-            if (useDefault) {
-                records.push({
-                    n1: parseInt(row[0]), n2: parseInt(row[1]), n3: parseInt(row[2]),
-                    n4: parseInt(row[3]), n5: parseInt(row[4]), n6: parseInt(row[5]), special: parseInt(row[6])
-                });
-            } else {
-                records.push({
-                    n1: parseInt(row[n1Idx]), n2: parseInt(row[n2Idx]), n3: parseInt(row[n3Idx]),
-                    n4: parseInt(row[n4Idx]), n5: parseInt(row[n5Idx]), n6: parseInt(row[n6Idx]), special: parseInt(row[specialIdx])
-                });
-            }
+            if (row.length < 8) continue;
+            const issue = row[0].trim();
+            const n1 = parseInt(row[1], 10);
+            const n2 = parseInt(row[2], 10);
+            const n3 = parseInt(row[3], 10);
+            const n4 = parseInt(row[4], 10);
+            const n5 = parseInt(row[5], 10);
+            const n6 = parseInt(row[6], 10);
+            const special = parseInt(row[7], 10);
+            if (isNaN(n1) || isNaN(n2) || isNaN(n3) || isNaN(n4) || isNaN(n5) || isNaN(n6) || isNaN(special)) continue;
+            records.push({ issue, n1, n2, n3, n4, n5, n6, special });
         }
         if (records.length === 0) throw new Error("沒有有效號碼");
-        console.log(`成功載入 ${records.length} 期數據`);
-        if (records.length > 180) records = records.slice(0, 180);
+        console.log(`成功載入 ${records.length} 期數據，最新期號：${records[0].issue}`);
+        if (records.length > 180) records.length = 180;
         currentIssueKey = getIssueKey(records);
         return records;
     } catch (err) {
@@ -575,19 +555,15 @@ async function renderSingle() {
         return;
     }
     const latest = rawData[0];
-    const total = rawData.length;
-    
     let recentHtml = '';
     for (let i=0; i<Math.min(5, rawData.length); i++) {
         const r = rawData[i];
-        const issueNum = getIssueNumber(i);
-        recentHtml += `<div class="recent-item"><strong>${issueNum}</strong> ${r.n1},${r.n2},${r.n3},${r.n4},${r.n5},${r.n6}</div>`;
+        recentHtml += `<div class="recent-item"><strong>${r.issue}</strong> ${r.n1},${r.n2},${r.n3},${r.n4},${r.n5},${r.n6}</div>`;
     }
-    
     const html = `
         <div class="card">
             <div class="latest-box">
-                <strong>✨ 最新一期 ${getIssueNumber(0)}</strong><br>
+                <strong>✨ 最新一期 ${latest.issue}</strong><br>
                 <div>
                     <span class="number-ball ${getBallClass(latest.n1)}">${latest.n1}</span>
                     <span class="number-ball ${getBallClass(latest.n2)}">${latest.n2}</span>
@@ -886,7 +862,7 @@ async function renderCheck() {
             resultHtml += `<div>中獎預測號碼：${hitDisplay}</div>`;
             resultHtml += `<div>${prizeText}</div>`;
         } 
-        else { // dantuo
+        else {
             const recommendedNumbers = [...record.data.dan, ...record.data.tuo];
             const hitNumbers = [...new Set(recommendedNumbers.filter(n => drawNumbers.includes(n)))];
             const mainHit = hitNumbers.length;
