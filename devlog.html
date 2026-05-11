@@ -30,7 +30,29 @@
         <h1>📝 開發者日誌 <span class="badge">持續更新</span></h1>
         <div class="sub">記錄系統每次改進、技術上嘅踩坑、數據洞察。</div>
 
-        <!-- 2026-05-12 -->
+        <!-- 2026-05-12 首篇開發日誌（置頂） -->
+        <div class="post">
+            <div class="post-title">📈 我哋點樣用 AI + 大數據分析六合彩？</div>
+            <div class="post-date">2026-05-12</div>
+            <div class="post-content">
+                <p>作為一個對數據科學同彩票有興趣嘅開發者，我發現市面上嘅六合彩分析工具大多數只係簡單嘅「隨機號碼產生器」，完全冇考慮歷史數據嘅統計規律。於是乎，我決定自己動手，整一個 <strong>真正基於大數據 + 機器學習概念</strong> 嘅分析系統。</p>
+                <p>呢個系統唔會保證你中獎（冇任何人可以），但佢會俾你一個科學化嘅參考——邊啲號碼最近熱、邊啲係盲門、邊種組合歷史上最常見。你可以自己決定跟唔跟。</p>
+                <p><strong>系統三大核心：</strong></p>
+                <ul>
+                    <li><strong>自動化數據收集</strong>：每日 22:03 GitHub Actions 定時抓取公開數據，寫入 Google Sheets。</li>
+                    <li><strong>完整統計分析</strong>：熱冷號、盲門、顏色分佈、奇偶大小和值區間尾數，全部圖表化。</li>
+                    <li><strong>AI 預測引擎</strong>：加權評分（熱號/冷號/避免重複）+ 組合過濾（和值/奇偶）。</li>
+                </ul>
+                <p><strong>真實命中率（初步）：</strong><br>
+                單式 73 注暫未中 3 個以上；複式 20 碼平均包 1.33 個中獎號；膽拖拖碼平均 1.00 個。<br>
+                會繼續收集數據微調演算法。</p>
+                <p><strong>技術改進：</strong>數據源更換、NaN 修復、Google Sheets API 踩坑、定時任務重啟等（詳見下方日誌）。</p>
+                <p>🔗 <a href="/">主頁</a> | <a href="/stats.html">統計頁</a> | <a href="/stats_real_accuracy.html">真實命中率</a></p>
+                <p>記住：博彩要有節制，系統只係娛樂參考。🙏</p>
+            </div>
+        </div>
+
+        <!-- 2026-05-12 真實命中率分析上線 -->
         <div class="post">
             <div class="post-title">🎯 真實命中率分析上線</div>
             <div class="post-date">2026-05-12</div>
@@ -45,15 +67,15 @@
             </div>
         </div>
 
-        <!-- 2026-05-11 統計頁面升級 -->
+        <!-- 2026-05-11 統計頁大升級 -->
         <div class="post">
             <div class="post-title">📊 統計頁大升級：盲門、顏色分佈、冷熱號</div>
             <div class="post-date">2026-05-11</div>
             <div class="post-content">
                 <p>大幅強化 <code>stats.html</code> 嘅分析功能：</p>
                 <ul>
-                    <li><strong>盲門</strong>：定義做「最近 180 期從未出現過嘅攪出號碼」，用灰色波波顯示，等大家可以留意極度冷門嘅號碼。</li>
-                    <li><strong>顏色分佈</strong>：跟返官方號碼顏色規則（紅/藍/綠），畫咗個圓餅圖，一眼睇晒邊種顏色出得多。</li>
+                    <li><strong>盲門</strong>：定義做「最近 180 期從未出現過嘅攪出號碼」，用灰色波波顯示。</li>
+                    <li><strong>顏色分佈</strong>：跟返官方號碼顏色規則（紅/藍/綠），畫咗個圓餅圖。</li>
                     <li><strong>熱冷號定義</strong>：熱號 = 最近 20 期出現次數最多嘅前 10 個號碼；冷號 = 出現最少嘅前 10 個。</li>
                     <li>另外仲加咗和值直方圖、區間分佈、尾數分佈等圖表。</li>
                 </ul>
@@ -61,68 +83,63 @@
             </div>
         </div>
 
-        <!-- 2026-05-11 數據源更換 -->
+        <!-- 2026-05-11 換數據源＋重寫解析器 -->
         <div class="post">
             <div class="post-title">🔄 換數據源＋重寫解析器</div>
             <div class="post-date">2026-05-11</div>
             <div class="post-content">
                 <p>原本靠一個公開數據網頁，點知佢改咗版面結構，搞到解析唔到，期號同號碼出晒 <code>NaN</code>。解決方法：</p>
                 <ul>
-                    <li>改用另一個結構穩定嘅公開數據頁（HTML 表格好整齊，唔使反爬）。</li>
-                    <li>重新寫 Python 爬蟲，用正則表達式直接由 <code>&lt;tbody&gt;</code> 裡面抽出第一個有效 <code>&lt;tr&gt;</code>，拎期號同號碼。</li>
+                    <li>改用另一個結構穩定嘅公開數據頁。</li>
+                    <li>重新寫 Python 爬蟲，用正則表達式直接由 <code>&lt;tbody&gt;</code> 裡面抽出第一個有效 <code>&lt;tr&gt;</code>。</li>
                     <li>加咗幾層備用解析規則，萬一第時條 markup 輕微改動都仲頂得住。</li>
-                    <li>再喺 workflow 入面 print 啲 debug 訊息，方便之後 troubleshoot。</li>
                 </ul>
                 <p>而家每日自動（香港時間 22:03）執行，成功將最新一期寫入 Google Sheets。</p>
             </div>
         </div>
 
-        <!-- 2026-05-10 前端顯示修復 -->
+        <!-- 2026-05-11 數據儲存嘅黑暗歷史（Google Sheets API） -->
+        <div class="post">
+            <div class="post-title">📁 數據儲存嘅黑暗歷史：Google Sheets API 同 Service Account 嘅搏鬥</div>
+            <div class="post-date">2026-05-11</div>
+            <div class="post-content">
+                <ul>
+                    <li>Service Account 權限：要 share 俾 <code>xxx@iam.gserviceaccount.com</code>，唔係自己 email。</li>
+                    <li>GitHub Secrets 格式：JSON 金鑰要壓成一行先唔會爛。</li>
+                    <li>gspread 版本問題：指定 <code>gspread==5.12.0</code>。</li>
+                    <li>Apps Script 中伏：timeout 同 debug 困難，最後放棄，直接用 Google Sheets API v4。</li>
+                    <li>期號含有 '/' 會被轉成日期：寫入前加單引號 <code>'26/049</code> 解決。</li>
+                </ul>
+                <p>而家流程穩定：Python + gspread + Service Account，每日 insert_row 到第二行。</p>
+            </div>
+        </div>
+
+        <!-- 2026-05-10 修正前端期號同 NaN -->
         <div class="post">
             <div class="post-title">🐛 修正首頁期號同 NaN 問題</div>
             <div class="post-date">2026-05-10</div>
             <div class="post-content">
                 <p>之前有用戶反映主頁顯示「26/047 NaN,9,17,...」，查完發現：</p>
                 <ul>
-                    <li>Google Sheets 其實已經有期號欄位，但前端 <code>loadCsvData()</code> 冇讀嗰一欄，反而用 <code>47 - index</code> 嚟自己計期號，搞到錯晒。</li>
+                    <li>Google Sheets 其實已經有期號欄位，但前端 <code>loadCsvData()</code> 冇讀嗰一欄，反而用 <code>47 - index</code> 嚟自己計期號。</li>
                     <li>修正方法：擴大讀取範圍到 A:H 列，正確解析期號同 6+1 個號碼。</li>
                     <li>同時改埋 <code>renderSingle</code> 入面最新一期同最近 5 期嘅顯示方式。</li>
                 </ul>
-                <p>而家主頁正確顯示「26/049 9,17,26,41,42,47 + 特別號 8」，冇晒 NaN。</p>
+                <p>而家主頁正確顯示「26/049 9,17,26,41,42,47 + 特別號 8」。</p>
             </div>
         </div>
-        
-<!-- 2026-05-11 補充：Google Sheets API 嘅血淚史 -->
-        <div class="post">
-             <div class="post-title">📁 數據儲存嘅黑暗歷史：Google Sheets API 同 Service Account 嘅搏鬥</div>
-             <div class="post-date">2026-05-09</div>
-             <div class="post-content">
-                <p>原本以為揾到數據源就搞掂，點知寫入 Google Sheets 先係另一個地獄。記錄低啲踩坑位，俾自己同將來嘅人睇：</p>
-                <ul>
-            <li><strong>Service Account 權限</strong>：要喺 Google Cloud Console 開一個 Service Account，下載 JSON 金鑰，然後將個 email 加入 Google Sheets 嘅分享權限（編輯者）。試咗好多次先發現原來係要 share 俾 <code>xxx@xxx.iam.gserviceaccount.com</code>，唔係俾自己 email。</li>
-            <li><strong>GitHub Secrets 格式</strong>：個 JSON 金鑰入面有換行同雙引號，直接貼入 GitHub Secrets 會爛。解決方法係將成個 JSON 壓成一行（或者 base64），再喺 Actions 入面 decode。最後我揀咗直接貼 raw JSON，但要用三引號包住喺 workflow 嘅 env 度。</li>
-            <li><strong>gspread 版本問題</strong>：actions/setup-python 預裝嘅 gspread 太舊，oauth2client 又 deprecated。結果要 pip install 指定版本：<code>gspread==5.12.0</code> 同 <code>google-auth-oauthlib</code>。</li>
-            <li><strong>讀取同寫入嘅 quota</strong>：免費版 Google Sheets API 每日有讀寫配額，好彩我哋一日只寫一次，讀取只係用戶 refresh 嗰陣先會發生，暫時夠用。</li>
-            <li><strong>Apps Script 中伏</strong>：最初想用 Google Apps Script 做 proxy，慳返 API key。但 Apps Script 嘅 UrlFetch 成日 timeout，日誌又難 debug，最後放棄，直接改用 Google Sheets API v4 配 API key 唯讀，寫入就用 Service Account。</li>
-            <li><strong>寫入時嘅亂碼</strong>：有期號包含 '/'，寫入 sheets 時會自動被轉成日期格式（例如 26/049 變 2026-04-09）。解決方法：寫入前將期號加一個前置單引號 <code>'26/049</code>，強制當作文本。</li>
-        </ul>
-        <p>而家個流程穩定咗：<br>
-        Python 用 <code>gspread</code> + Service Account JSON（放喺 GitHub Secret）→ 每日一次 insert_row 到第二行（最頂係最新一期）→ 前端直接用 API key 讀取 A:H 範圍。雖然中間撞板撞到七彩，但總算行得通。</p>
-    </div>
-</div>
+
         <!-- 2026-05-09 自動化架構 -->
         <div class="post">
             <div class="post-title">⏰ 自動化架構：GitHub Actions + Netlify</div>
             <div class="post-date">2026-05-09</div>
             <div class="post-content">
-                <p>為咗確保每日數據自動更新，我哋設定咗：</p>
                 <ul>
-                    <li><strong>GitHub Actions</strong>：每日香港時間 22:03 執行 Python 爬蟲，將最新一期結果寫入 Google Sheets。</li>
-                    <li><strong>Google Sheets API</strong>：前端的 <code>index.html</code> 同 <code>stats.html</code> 直接透過 API 讀取試算表，確保用戶永遠睇到最新數據。</li>
-                    <li><strong>Netlify 自動部署</strong>：每次 push 到 GitHub，Netlify 會自動 build 同 deploy，唔使手動攪。</li>
-                    <li>另外仲保留手動觸發（workflow_dispatch），方便即時測試。</li>
+                    <li><strong>GitHub Actions</strong>：每日香港時間 22:03 執行爬蟲，結果寫入 Google Sheets。</li>
+                    <li><strong>Google Sheets API</strong>：前端直接讀取試算表。</li>
+                    <li><strong>Netlify 自動部署</strong>：每次 push 自動 build & deploy。</li>
+                    <li>保留手動觸發（workflow_dispatch）方便測試。</li>
                 </ul>
-                <p>呢個架構令到維護成本極低。</p>
             </div>
         </div>
 
@@ -131,14 +148,12 @@
             <div class="post-title">🧠 預測算法核心：加權評分 + 組合過濾</div>
             <div class="post-date">2026-05-08</div>
             <div class="post-content">
-                <p>個 AI 預測唔係亂抽，背後用咗幾層統計模型：</p>
                 <ul>
-                    <li><strong>加權評分</strong>：越近期嘅號碼權重越高（指數衰減），同時考慮熱號、冷號、避免重覆上期號碼。</li>
-                    <li><strong>組合生成</strong>：單式由最高分嘅 20 個號碼入面隨機抽 6 個（但係用固定種子，可重現）。</li>
-                    <li><strong>複式</strong>：直接拎最高分嗰 N 個號碼 (N 可選 7~20)。</li>
-                    <li><strong>膽拖</strong>：先揀最高分嘅膽碼，再喺剩餘號碼入面揀最高分嘅拖碼。</li>
+                    <li>加權評分：近期權重高（指數衰減），考慮熱號、冷號、避免重覆上期。</li>
+                    <li>單式：由最高分嘅 20 個號碼隨機抽 6 個（固定種子可重現）。</li>
+                    <li>複式：直接拎最高分 N 個號碼。</li>
+                    <li>膽拖：先揀膽碼再揀拖碼。</li>
                 </ul>
-                <p>目前嘅參數（回顧期數 8、衰減 lambda 0.35、冷號門檻 6 期、熱號加成 1.2）仲可以透過真實命中率回測再 fine-tune。</p>
             </div>
         </div>
 
