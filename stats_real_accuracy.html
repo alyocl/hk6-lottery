@@ -139,42 +139,53 @@
         const replica = stats.replica;
         const dantuo = stats.dantuo;
 
+        // 強制將陣列長度補到 7 (0-6)
+        function padTo7(arr) {
+            const padded = [...arr];
+            while (padded.length < 7) padded.push(0);
+            return padded.slice(0,7);
+        }
+        function padTo3(arr) {
+            const padded = [...arr];
+            while (padded.length < 3) padded.push(0);
+            return padded.slice(0,3);
+        }
+
+        const replicaDist = padTo7(replica.dist);
+        const tuoDist = padTo7(dantuo.tuoDist);
+        const danDist = padTo3(dantuo.danDist);
+
         const singleRate3Plus = single.total ? (single.dist.slice(3).reduce((a,b)=>a+b,0) / single.total * 100).toFixed(2) : '0';
         const singlePercent = single.dist.map(c => single.total ? (c / single.total * 100).toFixed(1) : '0');
 
-        const replicaAvgHit = replica.total ? (replica.dist.reduce((s,c,i)=>s+c*i,0) / replica.total).toFixed(2) : '0';
-        const replicaAtLeast3 = replica.dist.slice(3).reduce((a,b)=>a+b,0);
+        const replicaAvgHit = replica.total ? (replicaDist.reduce((s,c,i)=>s+c*i,0) / replica.total).toFixed(2) : '0';
+        const replicaAtLeast3 = replicaDist.slice(3).reduce((a,b)=>a+b,0);
         const replicaRate3Plus = replica.total ? (replicaAtLeast3 / replica.total * 100).toFixed(2) : '0';
 
-        const danAvgHit = dantuo.total ? (dantuo.danDist.reduce((s,c,i)=>s+c*i,0) / dantuo.total).toFixed(2) : '0';
-        const tuoAvgHit = dantuo.total ? (dantuo.tuoDist.reduce((s,c,i)=>s+c*i,0) / dantuo.total).toFixed(2) : '0';
-        const danAtLeast1 = dantuo.danDist.slice(1).reduce((a,b)=>a+b,0);
+        const danAvgHit = dantuo.total ? (danDist.reduce((s,c,i)=>s+c*i,0) / dantuo.total).toFixed(2) : '0';
+        const tuoAvgHit = dantuo.total ? (tuoDist.reduce((s,c,i)=>s+c*i,0) / dantuo.total).toFixed(2) : '0';
+        const danAtLeast1 = danDist.slice(1).reduce((a,b)=>a+b,0);
         const danRate1Plus = dantuo.total ? (danAtLeast1 / dantuo.total * 100).toFixed(2) : '0';
 
-        // 輔助函數：確保陣列長度為 7
-        function ensureLen7(arr) {
-            const res = [...arr];
-            while (res.length < 7) res.push(0);
-            return res.slice(0,7);
-        }
-        const replicaDist7 = ensureLen7(replica.dist);
-        const tuoDist7 = ensureLen7(dantuo.tuoDist);
-        const danDist3 = [...dantuo.danDist]; while(danDist3.length<3) danDist3.push(0);
+        // 手動構建表格 HTML 確保每個格子都有數字
+        const replicaTableRows = `<tr>${replicaDist.map(v => `<td>${v}</td>`).join('')}</tr>`;
+        const tuoTableRows = `<tr>${tuoDist.map(v => `<td>${v}</td>`).join('')}</tr>`;
+        const danTableRows = `<tr>${danDist.map(v => `<td>${v}</td>`).join('')}</tr>`;
 
         const html = `
             <div class="card">
                 <h3>📌 單式 (用戶生成注)</h3>
                 <p>總注數：<strong>${single.total}</strong> &nbsp; | &nbsp; 🎯 至少中3個號碼的比例：<span class="metric">${singleRate3Plus}%</span></p>
                 <table><thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
-                <tbody><tr><td><strong>注數</strong></td>${single.dist.map(c=>`<td>${c}</td>`).join('')}</tr>
-                <tr><td><strong>百分比</strong></td>${singlePercent.map(p=>`<td>${p}%</td>`).join('')}</tr></tbody></table>
+                <tbody><tr><td><strong>注數</strong></td>${single.dist.map(c => `<td>${c}</td>`).join('')}</tr>
+                <tr><td><strong>百分比</strong></td>${singlePercent.map(p => `<td>${p}%</td>`).join('')}</tr></tbody></table>
                 <div class="info-note">註：每注命中3個以上即為有獎（七獎$40）</div>
             </div>
             <div class="card">
                 <h3>🔢 複式 (推薦N碼)</h3>
                 <p>總生成次數：<strong>${replica.total}</strong> &nbsp; | &nbsp; 📊 平均包含中獎號碼數：<span class="metric">${replicaAvgHit}</span> / 6 &nbsp; | &nbsp; 🎯 包含至少3個中獎號碼的比例：<span class="metric">${replicaRate3Plus}%</span></p>
                 <table><thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
-                <tbody><tr>${replicaDist7.map(c=>`<td>${c}</td>`).join('')}</tr></tbody></table>
+                <tbody>${replicaTableRows}</tbody></table>
                 <canvas id="replicaChart"></canvas>
             </div>
             <div class="card">
@@ -183,9 +194,9 @@
                 <p>🎯 膽碼平均命中數：<span class="metric">${danAvgHit}</span> / 2 &nbsp; | &nbsp; 膽碼命中≥1的比例：${danRate1Plus}%</p>
                 <p>🎲 拖碼平均命中數：<span class="metric">${tuoAvgHit}</span> / 6</p>
                 <table><thead><tr><th>膽碼命中</th><th>0</th><th>1</th><th>2</th></tr></thead>
-                <tbody><tr>${danDist3.map(c=>`<td>${c}</td>`).join('')}</tr></tbody></table>
+                <tbody>${danTableRows}</tbody></table>
                 <table style="margin-top:12px"><thead><tr><th>拖碼命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
-                <tbody><tr>${tuoDist7.map(c=>`<td>${c}</td>`).join('')}</tr></tbody></table>
+                <tbody>${tuoTableRows}</tbody></table>
                 <canvas id="dantuoChart"></canvas>
             </div>
             <div class="info-note">✅ 統計基於 ${predictions.length} 筆用戶預測記錄（匹配到開獎結果）。更新時間：${new Date().toLocaleString()}</div>
@@ -195,13 +206,13 @@
 
         if (replica.total) {
             new Chart(document.getElementById('replicaChart'), {
-                type: 'bar', data: { labels: ['0','1','2','3','4','5','6'], datasets: [{ label: '次數', data: replicaDist7, backgroundColor: '#3b82f6' }] },
+                type: 'bar', data: { labels: ['0','1','2','3','4','5','6'], datasets: [{ label: '次數', data: replicaDist, backgroundColor: '#3b82f6' }] },
                 options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, title: { display: true, text: '期數' } }, x: { title: { display: true, text: '命中正碼個數' } } } }
             });
         }
         if (dantuo.total) {
             new Chart(document.getElementById('dantuoChart'), {
-                type: 'bar', data: { labels: ['0','1','2'], datasets: [{ label: '膽碼命中', data: danDist3, backgroundColor: '#f97316' }, { label: '拖碼命中 (0~6)', data: tuoDist7, backgroundColor: '#10b981' }] },
+                type: 'bar', data: { labels: ['0','1','2'], datasets: [{ label: '膽碼命中', data: danDist, backgroundColor: '#f97316' }, { label: '拖碼命中 (0~6)', data: tuoDist, backgroundColor: '#10b981' }] },
                 options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true, title: { display: true, text: '次數' } } } }
             });
         }
