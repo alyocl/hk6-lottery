@@ -7,24 +7,21 @@
     <style>
         * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans TC', sans-serif; }
         body { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); margin: 0; padding: 20px; min-height: 100vh; }
-        .container { max-width: 900px; margin: 0 auto; background: rgba(255,255,255,0.1); backdrop-filter: blur(2px); border-radius: 2rem; padding: 1.5rem; box-shadow: 0 20px 35px -10px rgba(0,0,0,0.4); }
-        .card { background: white; border-radius: 1.5rem; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        .container { max-width: 1000px; margin: 0 auto; background: rgba(255,255,255,0.1); backdrop-filter: blur(2px); border-radius: 2rem; padding: 1.5rem; box-shadow: 0 20px 35px -10px rgba(0,0,0,0.4); }
+        .card { background: white; border-radius: 1.5rem; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
         h1 { margin: 0 0 0.25rem 0; font-size: 1.8rem; color: #0f172a; display: flex; align-items: center; gap: 8px; }
         .badge { background: #10b981; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 40px; }
-        .sub { color: #475569; font-size: 0.85rem; border-left: 3px solid #f97316; padding-left: 0.75rem; margin-top: 6px; }
-        h3 { margin-top: 0; color: #0f172a; border-bottom: 2px solid #f97316; display: inline-block; padding-bottom: 4px; }
+        .sub { color: #475569; font-size: 0.85rem; border-left: 3px solid #f97316; padding-left: 0.75rem; margin-top: 6px; margin-bottom: 1.5rem; }
         table { width: 100%; border-collapse: collapse; margin: 12px 0; }
         th, td { padding: 8px 6px; text-align: center; border-bottom: 1px solid #e2e8f0; }
         th { background-color: #f1f5f9; font-weight: 600; }
         .metric { font-size: 1.4rem; font-weight: bold; color: #f97316; }
         .info-note { font-size: 0.75rem; color: #475569; margin-top: 8px; text-align: center; }
         .footer-links { text-align: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; }
-        .footer-links a { color: #f97316; text-decoration: none; margin: 0 10px; font-size: 0.8rem; }
+        .footer-links a { color: #f97316; text-decoration: none; margin: 0 12px; font-size: 0.9rem; }
         canvas { max-height: 200px; width: 100%; margin-top: 10px; }
         .loading { text-align: center; padding: 2rem; color: #475569; }
         .error-box { background: #fee2e2; border-radius: 1rem; padding: 1rem; text-align: center; color: #dc2626; }
-        .stat-block { margin-bottom: 24px; }
-        .small-note { font-size: 0.7rem; color: #6b7280; text-align: center; margin-top: 8px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -39,7 +36,6 @@
 </div>
 
 <script>
-    // ==================== Google Sheets 設定 ====================
     const API_KEY = 'AIzaSyCmpR7qGwgfE3y7XIS-O1_cny_iBsDa7No';
     const RESULT_SHEET_ID = '1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw';
     const RESULT_RANGE = 'sheet1!A:H';
@@ -155,46 +151,41 @@
         const danAtLeast1 = dantuo.danDist.slice(1).reduce((a,b)=>a+b,0);
         const danRate1Plus = dantuo.total ? (danAtLeast1 / dantuo.total * 100).toFixed(2) : '0';
 
+        // 輔助函數：確保陣列長度為 7
+        function ensureLen7(arr) {
+            const res = [...arr];
+            while (res.length < 7) res.push(0);
+            return res.slice(0,7);
+        }
+        const replicaDist7 = ensureLen7(replica.dist);
+        const tuoDist7 = ensureLen7(dantuo.tuoDist);
+        const danDist3 = [...dantuo.danDist]; while(danDist3.length<3) danDist3.push(0);
+
         const html = `
-            <!-- 單式 -->
             <div class="card">
                 <h3>📌 單式 (用戶生成注)</h3>
                 <p>總注數：<strong>${single.total}</strong> &nbsp; | &nbsp; 🎯 至少中3個號碼的比例：<span class="metric">${singleRate3Plus}%</span></p>
-                <table>
-                    <thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
-                    <tbody>
-                        <tr><td><strong>注數</strong></td>${single.dist.map(c => `<td>${c}</td>`).join('')}</tr>
-                        <tr><td><strong>百分比</strong></td>${singlePercent.map(p => `<td>${p}%</td>`).join('')}</tr>
-                    </tbody>
-                </table>
+                <table><thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
+                <tbody><tr><td><strong>注數</strong></td>${single.dist.map(c=>`<td>${c}</td>`).join('')}</tr>
+                <tr><td><strong>百分比</strong></td>${singlePercent.map(p=>`<td>${p}%</td>`).join('')}</tr></tbody></table>
                 <div class="info-note">註：每注命中3個以上即為有獎（七獎$40）</div>
             </div>
-
-            <!-- 複式 -->
             <div class="card">
                 <h3>🔢 複式 (推薦N碼)</h3>
                 <p>總生成次數：<strong>${replica.total}</strong> &nbsp; | &nbsp; 📊 平均包含中獎號碼數：<span class="metric">${replicaAvgHit}</span> / 6 &nbsp; | &nbsp; 🎯 包含至少3個中獎號碼的比例：<span class="metric">${replicaRate3Plus}%</span></p>
-                <table>
-                    <thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
-                    <tbody><tr>${replica.dist.map(c => `<td>${c}</td>`).join('')}</tr></tbody>
-                </table>
+                <table><thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
+                <tbody><tr>${replicaDist7.map(c=>`<td>${c}</td>`).join('')}</tr></tbody></table>
                 <canvas id="replicaChart"></canvas>
             </div>
-
-            <!-- 膽拖 -->
             <div class="card">
                 <h3>🎯 膽拖</h3>
                 <p>總生成次數：<strong>${dantuo.total}</strong></p>
                 <p>🎯 膽碼平均命中數：<span class="metric">${danAvgHit}</span> / 2 &nbsp; | &nbsp; 膽碼命中≥1的比例：${danRate1Plus}%</p>
                 <p>🎲 拖碼平均命中數：<span class="metric">${tuoAvgHit}</span> / 6</p>
-                <table>
-                    <thead><tr><th>膽碼命中</th><th>0</th><th>1</th><th>2</th></tr></thead>
-                    <tbody><tr>${dantuo.danDist.map(c => `<td>${c}</td>`).join('')}</tr></tbody>
-                </table>
-                <table style="margin-top:12px">
-                    <thead><tr><th>拖碼命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
-                    <tbody><tr>${dantuo.tuoDist.map(c => `<td>${c}</td>`).join('')}</tr></tbody>
-                </table>
+                <table><thead><tr><th>膽碼命中</th><th>0</th><th>1</th><th>2</th></tr></thead>
+                <tbody><tr>${danDist3.map(c=>`<td>${c}</td>`).join('')}</tr></tbody></table>
+                <table style="margin-top:12px"><thead><tr><th>拖碼命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
+                <tbody><tr>${tuoDist7.map(c=>`<td>${c}</td>`).join('')}</tr></tbody></table>
                 <canvas id="dantuoChart"></canvas>
             </div>
             <div class="info-note">✅ 統計基於 ${predictions.length} 筆用戶預測記錄（匹配到開獎結果）。更新時間：${new Date().toLocaleString()}</div>
@@ -204,13 +195,13 @@
 
         if (replica.total) {
             new Chart(document.getElementById('replicaChart'), {
-                type: 'bar', data: { labels: ['0','1','2','3','4','5','6'], datasets: [{ label: '次數', data: replica.dist, backgroundColor: '#3b82f6' }] },
+                type: 'bar', data: { labels: ['0','1','2','3','4','5','6'], datasets: [{ label: '次數', data: replicaDist7, backgroundColor: '#3b82f6' }] },
                 options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, title: { display: true, text: '期數' } }, x: { title: { display: true, text: '命中正碼個數' } } } }
             });
         }
         if (dantuo.total) {
             new Chart(document.getElementById('dantuoChart'), {
-                type: 'bar', data: { labels: ['0','1','2'], datasets: [{ label: '膽碼命中', data: dantuo.danDist, backgroundColor: '#f97316' }, { label: '拖碼命中 (0~6)', data: dantuo.tuoDist, backgroundColor: '#10b981' }] },
+                type: 'bar', data: { labels: ['0','1','2'], datasets: [{ label: '膽碼命中', data: danDist3, backgroundColor: '#f97316' }, { label: '拖碼命中 (0~6)', data: tuoDist7, backgroundColor: '#10b981' }] },
                 options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true, title: { display: true, text: '次數' } } } }
             });
         }
