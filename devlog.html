@@ -91,7 +91,25 @@
                 <p>而家主頁正確顯示「26/049 9,17,26,41,42,47 + 特別號 8」，冇晒 NaN。</p>
             </div>
         </div>
-
+        
+<!-- 2026-05-11 補充：Google Sheets API 嘅血淚史 -->
+        <div class="post">
+             <div class="post-title">📁 數據儲存嘅黑暗歷史：Google Sheets API 同 Service Account 嘅搏鬥</div>
+             <div class="post-date">2026-05-11</div>
+             <div class="post-content">
+                <p>原本以為揾到數據源就搞掂，點知寫入 Google Sheets 先係另一個地獄。記錄低啲踩坑位，俾自己同將來嘅人睇：</p>
+                <ul>
+            <li><strong>Service Account 權限</strong>：要喺 Google Cloud Console 開一個 Service Account，下載 JSON 金鑰，然後將個 email 加入 Google Sheets 嘅分享權限（編輯者）。試咗好多次先發現原來係要 share 俾 <code>xxx@xxx.iam.gserviceaccount.com</code>，唔係俾自己 email。</li>
+            <li><strong>GitHub Secrets 格式</strong>：個 JSON 金鑰入面有換行同雙引號，直接貼入 GitHub Secrets 會爛。解決方法係將成個 JSON 壓成一行（或者 base64），再喺 Actions 入面 decode。最後我揀咗直接貼 raw JSON，但要用三引號包住喺 workflow 嘅 env 度。</li>
+            <li><strong>gspread 版本問題</strong>：actions/setup-python 預裝嘅 gspread 太舊，oauth2client 又 deprecated。結果要 pip install 指定版本：<code>gspread==5.12.0</code> 同 <code>google-auth-oauthlib</code>。</li>
+            <li><strong>讀取同寫入嘅 quota</strong>：免費版 Google Sheets API 每日有讀寫配額，好彩我哋一日只寫一次，讀取只係用戶 refresh 嗰陣先會發生，暫時夠用。</li>
+            <li><strong>Apps Script 中伏</strong>：最初想用 Google Apps Script 做 proxy，慳返 API key。但 Apps Script 嘅 UrlFetch 成日 timeout，日誌又難 debug，最後放棄，直接改用 Google Sheets API v4 配 API key 唯讀，寫入就用 Service Account。</li>
+            <li><strong>寫入時嘅亂碼</strong>：有期號包含 '/'，寫入 sheets 時會自動被轉成日期格式（例如 26/049 變 2026-04-09）。解決方法：寫入前將期號加一個前置單引號 <code>'26/049</code>，強制當作文本。</li>
+        </ul>
+        <p>而家個流程穩定咗：<br>
+        Python 用 <code>gspread</code> + Service Account JSON（放喺 GitHub Secret）→ 每日一次 insert_row 到第二行（最頂係最新一期）→ 前端直接用 API key 讀取 A:H 範圍。雖然中間撞板撞到七彩，但總算行得通。</p>
+    </div>
+</div>
         <!-- 2026-05-09 自動化架構 -->
         <div class="post">
             <div class="post-title">⏰ 自動化架構：GitHub Actions + Netlify</div>
