@@ -128,7 +128,7 @@
 
     // ==================== 統計分析 ====================
     function computeStats() {
-        // 單式統計：每注命中個數分佈
+        // 單式統計：每注命中個數分佈 (0-6)
         let singleHitDist = [0,0,0,0,0,0,0];
         let singleTotalTickets = 0;
         let singleAtLeast3 = 0;
@@ -146,24 +146,24 @@
             const mode = pred.mode;
             const resultNums = pred.resultNumbers;
             if (mode === 'single') {
-                const tickets = pred.rec; // 數組數組
+                const tickets = pred.rec;
                 for (let ticket of tickets) {
                     const hitCount = ticket.filter(n => resultNums.includes(n)).length;
-                    singleHitDist[hitCount]++;
+                    if (hitCount >= 0 && hitCount <= 6) singleHitDist[hitCount]++;
                     singleTotalTickets++;
                     if (hitCount >= 3) singleAtLeast3++;
                 }
             } else if (mode === 'replica') {
-                const recNumbers = pred.rec; // 數組
+                const recNumbers = pred.rec;
                 const hitCount = recNumbers.filter(n => resultNums.includes(n)).length;
-                replicaHitDist[hitCount]++;
+                if (hitCount >= 0 && hitCount <= 6) replicaHitDist[hitCount]++;
                 replicaTotalDraws++;
             } else if (mode === 'dantuo') {
                 const { dan, tuo } = pred.rec;
                 const danHit = dan.filter(n => resultNums.includes(n)).length;
                 const tuoHit = tuo.filter(n => resultNums.includes(n)).length;
-                if (danHit <= 2) danHitDist[danHit]++;
-                if (tuoHit <= 6) tuoHitDist[tuoHit]++;
+                if (danHit >= 0 && danHit <= 2) danHitDist[danHit]++;
+                if (tuoHit >= 0 && tuoHit <= 6) tuoHitDist[tuoHit]++;
                 dantuoTotalDraws++;
             }
         }
@@ -182,6 +182,7 @@
         const dantuo = stats.dantuo;
 
         const singleHitRate = single.totalTickets ? (single.atLeast3 / single.totalTickets * 100).toFixed(2) : '0';
+        // 確保百分比也有7個元素
         const singleHitDistPercent = single.hitDist.map(c => single.totalTickets ? (c / single.totalTickets * 100).toFixed(1) : '0');
 
         const replicaAvgHit = replica.totalDraws ? (replica.hitDist.reduce((sum, cnt, i) => sum + cnt * i, 0) / replica.totalDraws).toFixed(2) : '0';
@@ -199,9 +200,13 @@
                     <h3>📌 單式 (用戶生成注)</h3>
                     <p>總注數：<strong>${single.totalTickets}</strong></p>
                     <p>🎯 至少中3個號碼的注數比例：<span class="metric">${singleHitRate}%</span></p>
-                    <table><thead><tr><th>命中個數</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
-                    <tbody><tr>${single.hitDist.map(c => `<td>${c}</td>`).join('')}</tr>
-                    <tr>${singleHitDistPercent.map(p => `<td>${p}%</td>`).join('')}</tr></tbody></table>
+                    <table>
+                        <thead><tr><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
+                        <tbody>
+                            <tr>${single.hitDist.map(c => `<td>${c}</td>`).join('')}</tr>
+                            <tr>${singleHitDistPercent.map(p => `<td>${p}%</td>`).join('')}</tr>
+                        </tbody>
+                    </table>
                     <div class="info-note">註：每注命中3個以上即為有獎（七獎$40）</div>
                 </div>
                 <div class="stat-card">
