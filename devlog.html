@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>開發者日誌 - 六合彩 AI 分析系統</title>
+    <meta name="description" content="完整記錄六合彩 AI 分析系統嘅開發歷程：數據抓取演進、統計功能、命中率分析、定時自動化等技術細節。">
+    <link rel="canonical" href="https://hk6.netlify.app/devlog.html">
+    <style>
+        * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans TC', sans-serif; }
+        body { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); margin: 0; padding: 20px; min-height: 100vh; }
+        .container { max-width: 1000px; margin: 0 auto; background: rgba(255,255,255,0.1); backdrop-filter: blur(2px); border-radius: 2rem; padding: 1.5rem; box-shadow: 0 20px 35px -10px rgba(0,0,0,0.4); }
+        .card { background: white; border-radius: 1.5rem; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        h1 { margin: 0 0 0.25rem 0; font-size: 1.8rem; color: #0f172a; display: flex; align-items: center; gap: 8px; }
+        .badge { background: #10b981; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 40px; }
+        .sub { color: #475569; font-size: 0.85rem; border-left: 3px solid #f97316; padding-left: 0.75rem; margin-top: 6px; margin-bottom: 1.5rem; }
+        .post { margin-bottom: 2rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem; }
+        .post-title { font-size: 1.4rem; font-weight: bold; color: #0f172a; margin-bottom: 0.25rem; }
+        .post-date { color: #64748b; font-size: 0.8rem; margin-bottom: 0.75rem; }
+        .post-content { color: #1e293b; line-height: 1.5; }
+        .code-block { background: #f1f5f9; padding: 0.5rem; border-radius: 0.5rem; font-family: monospace; font-size: 0.85rem; overflow-x: auto; margin: 0.5rem 0; }
+        .footer-links { text-align: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; }
+        .footer-links a { color: #f97316; text-decoration: none; margin: 0 12px; font-size: 0.9rem; }
+        .back-link { display: inline-block; margin-top: 1rem; color: #f97316; text-decoration: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <h1>📝 開發者日誌 <span class="badge">持續更新</span></h1>
+        <div class="sub">記錄系統每次改進、技術上嘅踩坑、數據洞察。</div>
+
+        <!-- 2026-05-12 -->
+        <div class="post">
+            <div class="post-title">🎯 真實命中率分析上線</div>
+            <div class="post-date">2026-05-12</div>
+            <div class="post-content">
+                <p>加咗 <code>stats_real_accuracy.html</code> 呢頁，夾埋 Google Form 收集嘅用戶預測數據，同真實開獎結果對比，計返單式、複式、膽拖嘅實際命中分佈。</p>
+                <ul>
+                    <li>單式：暫時累積 73 注，命中 3 個或以上號碼嘅比例係 0%（仲要更多數據先睇得真）。</li>
+                    <li>複式：推薦 20 個號碼平均包含 1.33 個中獎號碼。</li>
+                    <li>膽拖：拖碼平均命中 1.00 個。</li>
+                </ul>
+                <p>之後會根據呢啲真實回饋，調整預測算法嘅參數，希望慢慢提升中獎率。</p>
+            </div>
+        </div>
+
+        <!-- 2026-05-11 統計頁面升級 -->
+        <div class="post">
+            <div class="post-title">📊 統計頁大升級：盲門、顏色分佈、冷熱號</div>
+            <div class="post-date">2026-05-11</div>
+            <div class="post-content">
+                <p>大幅強化 <code>stats.html</code> 嘅分析功能：</p>
+                <ul>
+                    <li><strong>盲門</strong>：定義做「最近 180 期從未出現過嘅攪出號碼」，用灰色波波顯示，等大家可以留意極度冷門嘅號碼。</li>
+                    <li><strong>顏色分佈</strong>：跟返官方號碼顏色規則（紅/藍/綠），畫咗個圓餅圖，一眼睇晒邊種顏色出得多。</li>
+                    <li><strong>熱冷號定義</strong>：熱號 = 最近 20 期出現次數最多嘅前 10 個號碼；冷號 = 出現最少嘅前 10 個。</li>
+                    <li>另外仲加咗和值直方圖、區間分佈、尾數分佈等圖表。</li>
+                </ul>
+                <p>所有圖表都係每次 refresh 頁面時直接讀 Google Sheets 嘅最新數據，唔使人手更新。</p>
+            </div>
+        </div>
+
+        <!-- 2026-05-11 數據源更換 -->
+        <div class="post">
+            <div class="post-title">🔄 換數據源＋重寫解析器</div>
+            <div class="post-date">2026-05-11</div>
+            <div class="post-content">
+                <p>原本靠一個公開數據網頁，點知佢改咗版面結構，搞到解析唔到，期號同號碼出晒 <code>NaN</code>。解決方法：</p>
+                <ul>
+                    <li>改用另一個結構穩定嘅公開數據頁（HTML 表格好整齊，唔使反爬）。</li>
+                    <li>重新寫 Python 爬蟲，用正則表達式直接由 <code>&lt;tbody&gt;</code> 裡面抽出第一個有效 <code>&lt;tr&gt;</code>，拎期號同號碼。</li>
+                    <li>加咗幾層備用解析規則，萬一第時條 markup 輕微改動都仲頂得住。</li>
+                    <li>再喺 workflow 入面 print 啲 debug 訊息，方便之後 troubleshoot。</li>
+                </ul>
+                <p>而家每日自動（香港時間 22:03）執行，成功將最新一期寫入 Google Sheets。</p>
+            </div>
+        </div>
+
+        <!-- 2026-05-10 前端顯示修復 -->
+        <div class="post">
+            <div class="post-title">🐛 修正首頁期號同 NaN 問題</div>
+            <div class="post-date">2026-05-10</div>
+            <div class="post-content">
+                <p>之前有用戶反映主頁顯示「26/047 NaN,9,17,...」，查完發現：</p>
+                <ul>
+                    <li>Google Sheets 其實已經有期號欄位，但前端 <code>loadCsvData()</code> 冇讀嗰一欄，反而用 <code>47 - index</code> 嚟自己計期號，搞到錯晒。</li>
+                    <li>修正方法：擴大讀取範圍到 A:H 列，正確解析期號同 6+1 個號碼。</li>
+                    <li>同時改埋 <code>renderSingle</code> 入面最新一期同最近 5 期嘅顯示方式。</li>
+                </ul>
+                <p>而家主頁正確顯示「26/049 9,17,26,41,42,47 + 特別號 8」，冇晒 NaN。</p>
+            </div>
+        </div>
+
+        <!-- 2026-05-09 自動化架構 -->
+        <div class="post">
+            <div class="post-title">⏰ 自動化架構：GitHub Actions + Netlify</div>
+            <div class="post-date">2026-05-09</div>
+            <div class="post-content">
+                <p>為咗確保每日數據自動更新，我哋設定咗：</p>
+                <ul>
+                    <li><strong>GitHub Actions</strong>：每日香港時間 22:03 執行 Python 爬蟲，將最新一期結果寫入 Google Sheets。</li>
+                    <li><strong>Google Sheets API</strong>：前端的 <code>index.html</code> 同 <code>stats.html</code> 直接透過 API 讀取試算表，確保用戶永遠睇到最新數據。</li>
+                    <li><strong>Netlify 自動部署</strong>：每次 push 到 GitHub，Netlify 會自動 build 同 deploy，唔使手動攪。</li>
+                    <li>另外仲保留手動觸發（workflow_dispatch），方便即時測試。</li>
+                </ul>
+                <p>呢個架構令到維護成本極低，而且完全免費。</p>
+            </div>
+        </div>
+
+        <!-- 2026-05-08 預測算法核心 -->
+        <div class="post">
+            <div class="post-title">🧠 預測算法核心：加權評分 + 組合過濾</div>
+            <div class="post-date">2026-05-08</div>
+            <div class="post-content">
+                <p>個 AI 預測唔係亂抽，背後用咗幾層統計模型：</p>
+                <ul>
+                    <li><strong>加權評分</strong>：越近期嘅號碼權重越高（指數衰減），同時考慮熱號、冷號、避免重覆上期號碼。</li>
+                    <li><strong>組合生成</strong>：單式由最高分嘅 20 個號碼入面隨機抽 6 個（但係用固定種子，可重現）。</li>
+                    <li><strong>複式</strong>：直接拎最高分嗰 N 個號碼 (N 可選 7~20)。</li>
+                    <li><strong>膽拖</strong>：先揀最高分嘅膽碼，再喺剩餘號碼入面揀最高分嘅拖碼。</li>
+                </ul>
+                <p>目前嘅參數（回顧期數 8、衰減 lambda 0.35、冷號門檻 6 期、熱號加成 1.2）仲可以透過真實命中率回測再 fine-tune。</p>
+            </div>
+        </div>
+
+        <a href="/" class="back-link">← 返去預測系統</a>
+    </div>
+
+    <div class="footer-links">
+        <a href="/">主頁</a> | <a href="/stats.html">統計數據</a> | <a href="/devlog.html">開發日誌</a>
+    </div>
+</div>
+</body>
+</html>
