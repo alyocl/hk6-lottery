@@ -157,6 +157,26 @@
             </div>
         </div>
 
+        <!-- 2026-04-15：由純粹同 Copilot 對話，到以設計者身份用 AI 完成系統 -->
+<div class="post">
+    <div class="post-title">🗣️ 由「齋 prompt」到「AI 寫 code，我負責設計」</div>
+    <div class="post-date">2026-04-15</div>
+    <div class="post-content">
+        <p><strong>🤖 第一階段：只係同 Copilot 對話</strong><br>
+        最初我冇諗過整網站，只係對住 Copilot 落 prompt，叫佢：「根據歷史數據，先分析過去十年嘅號碼分佈；然後再加入近期 15–20 期嘅數據做交叉比對；最後用防守方法、江恩週期、移動平均、馬可夫鏈，搵出最大機會率嘅號碼」。嗰陣時我只係當一個數學實驗，所有「模型」都係 Copilot 幫我生成嘅文字描述同虛擬碼，我一行真正嘅程式碼都冇寫過。</p>
+        <p><strong>💡 第二階段：決定整一個真嘅系統，我做設計者</strong><br>
+        覺得個概念幾有趣，的起心肝要將佢變成一個任何人都用到嘅網站。但自己唔想由零寫 code，於是轉換角色：我係 **設計者**，負責規劃功能、流程、視覺方向，然後交俾 AI（例如 ChatGPT、Copilot）幫我生成所有 HTML、CSS、JavaScript。我只係列出需求、決定版面點排、選擇用邊種圖表、定義咩係「熱號」「冷號」「盲門」，然後將 AI 產生嘅 code copy & paste 上 Netlify 試行。</p>
+        <p><strong>🐞 第三階段：debug 嘅關鍵——畀方向 AI</strong><br>
+        當 AI 寫嘅 code 出錯，我發現佢成日會陷入一個重複 loop：同一個問題改完又錯、錯完又改，來回好多次都解決唔到。呢個時候，我嘅角色就變得好重要：我要仔細睇 error message、推測可能嘅原因，然後俾一個具體嘅 debug 方向畀 AI（例如「你試下檢查 variable scope」、「應該係 async/await 嘅問題，試下重組 Promise」）。AI 收到明確方向之後，通常一兩次就搞掂。如果淨係掉句「唔 work，幫我改」，佢就會無限 loop。所以 debug 階段，設計者嘅邏輯思維同埋俾方向嘅能力，比起純粹盲試更關鍵。</p>
+        <p><strong>🔧 第四階段：加入真實數據同自動化，繼續做設計者</strong><br>
+        網站要有真實數據先有意義。我設計咗數據流程：每日定時抓取公開結果 → 存入 Google Sheets → 前端讀取顯示。我叫 AI 幫我寫 Python 爬蟲，用 GitHub Actions 定時執行，並透過 Google Sheets API 儲存。前端點樣讀取試算表、點樣顯示預測同統計，都係我講個概念，然後 AI 生成 JavaScript。debug 嗰陣又係由我俾方向，先突破到 AI 嘅 loop。</p>
+        <p><strong>📈 第五階段：統計、SEO、開發者日誌，全部由我設計、AI 實作</strong><br>
+        系統成形之後，我設計咗統計頁面要顯示嘅指標（熱冷號、盲門、顏色分佈、和值直方圖），又叫 AI 加真實命中率追蹤功能、開發者日誌，仲有基本 SEO 設定（sitemap、robots.txt、meta tags）。每一個功能都係我先畫出「要咩效果」，然後 AI 生 code，我負責整合同 deploy。遇到 AI 改極都改唔好嘅問題，我就會自己分析，畀個方向佢，通常就好快解決。</p>
+        <p><strong>🎯 回顧</strong><br>
+        由純粹同 Copilot 傾計，到最後 deploy 出一個完整嘅網站，我嘅角色係 **設計者**，同時係 **debug 方向嘅畀出者**。我自己冇寫過一行核心邏輯，但需要具備足夠嘅邏輯同除錯 sense，先可以帶領 AI 走出無限 loop。呢個開發日誌，係一份「普通人以設計者身份，用 AI 由零到一建立網站」嘅真實記錄。</p>
+    </div>
+</div>
+        
         <a href="/" class="back-link">← 返去預測系統</a>
     </div>
 
