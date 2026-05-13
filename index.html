@@ -351,10 +351,11 @@ const API_KEY = 'AIzaSyCmpR7qGwgfE3y7XIS-O1_cny_iBsDa7No';
 const SPREADSHEET_ID = '1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw';
 const RANGE = 'sheet1!A:H';  // A列:期號, B~G: n1~n6, H: special
 const MODEL_CONFIG = {
-    lookback: 8,
-    decay_lambda: 0.35,
-    cold_threshold: 6,
-    hot_boost: 1.2
+    lookback: 30,           // 增加到30期，兼顧短期與中期
+    decay_lambda: 0.25,     // 衰減變慢，讓更多歷史期數有貢獻
+    cold_threshold: 12,     // 冷號門檻提高到12期，避免過度追冷
+    hot_boost: 1.8,         // 提高近期熱號加權
+    extreme_cold_penalty: 0.7   // 新增：超過20期未出的號碼降權
 };
 
 let rawData = [];
@@ -490,17 +491,21 @@ async function loadCsvData() {
 // ==================== 核心預測演算法 ====================
 function getScores(dataSeries, currentIdx) {
     const score = new Array(50).fill(0);
-    const { lookback, decay_lambda, cold_threshold, hot_boost } = MODEL_CONFIG;
+    const { lookback, decay_lambda, cold_threshold, hot_boost, extreme_cold_penalty } = MODEL_CONFIG;
+    
+    // 1. 指數衰減權重 (短期為主，長期為輔)
     const start = Math.max(0, currentIdx - lookback);
     for (let offset = 0; offset < currentIdx - start; offset++) {
         const t = start + offset;
         const age = currentIdx - t - 1;
-        const w = Math.exp(-decay_lambda * age);
+        const w = Math.exp(-decay_lambda * age);   // 越近期權重越高
         const row = dataSeries[t];
         for (let col of ['n1','n2','n3','n4','n5','n6']) {
             score[row[col]] += w;
         }
     }
+
+    // 2. 冷號處理：使用二次指數，超過門檻後緩慢加分，但超過20期反倒扣分
     const lastSeen = new Array(50).fill(-1);
     for (let t = currentIdx-1; t >= 0; t--) {
         const row = dataSeries[t];
@@ -512,25 +517,33 @@ function getScores(dataSeries, currentIdx) {
     const coldScore = new Array(50).fill(0);
     for (let i=1;i<=49;i++) {
         const d = (lastSeen[i] === -1) ? 999 : (currentIdx - lastSeen[i] - 1);
-        if (d > cold_threshold) coldScore[i] = Math.min(1.5, (d - cold_threshold) / 8);
+        if (d > cold_threshold && d <= 20) {
+            coldScore[i] = 0.5 * Math.log(d - cold_threshold + 1);   // 緩增
+        } else if (d > 20) {
+            coldScore[i] = -extreme_cold_penalty;   // 超過20期未出，降權
+        }
     }
+
+    // 3. 熱號加權：最近3期內出現次數加權 (提高短期重要性)
     const hotScore = new Array(50).fill(0);
     for (let i=1;i<=49;i++) {
         let cnt = 0;
-        for (let t = Math.max(0, currentIdx-2); t < currentIdx; t++) {
+        const checkPeriods = Math.min(3, currentIdx);
+        for (let t = currentIdx-checkPeriods; t < currentIdx; t++) {
             const row = dataSeries[t];
             if ([row.n1,row.n2,row.n3,row.n4,row.n5,row.n6].includes(i)) cnt++;
         }
-        if (cnt > 0) hotScore[i] = hot_boost * cnt * 1.5;
+        if (cnt > 0) hotScore[i] = hot_boost * cnt;
     }
-    let avoidScore = new Array(50).fill(0);
-    for (let i=1;i<=31;i++) avoidScore[i] += 0.2;
-    if (currentIdx > 0) {
-        const prev = dataSeries[currentIdx-1];
-        for (let col of ['n1','n2','n3','n4','n5','n6']) avoidScore[prev[col]] += 0.5;
-    }
+
+    // 4. 移除 avoidScore (不再懲罰小號區間，也不加倍懲罰上期號碼)
+    // 改為：輕微鼓勵「鄰近區間」(可選，目前先不做)
+
+    // 最終綜合分數 (提高短期權重佔比)
     const final = new Array(50);
-    for (let i=0;i<=49;i++) final[i] = 0.35*score[i] + 0.30*coldScore[i] + 0.25*hotScore[i] - 0.10*avoidScore[i];
+    for (let i=0;i<=49;i++) {
+        final[i] = 0.45 * score[i] + 0.15 * coldScore[i] + 0.40 * hotScore[i];
+    }
     return final;
 }
 function getTopNumbers(dataSeries, count, exclude = []) {
@@ -550,24 +563,30 @@ function combination(n, k) {
 function predictTicketsFixed(dataSeries, nTickets) {
     const currentIdx = dataSeries.length;
     const final = getScores(dataSeries, currentIdx);
+    
+    // 取得所有號碼按分數排序
     let candidates = Array.from({length:49}, (_,i)=>i+1);
     candidates.sort((a,b)=> final[b] - final[a]);
-    const top20 = candidates.slice(0,20);
+    
+    // 取前 12 名作為核心池 (分數最高的12個號碼)
+    const corePool = candidates.slice(0, 12);
+    
     const tickets = [];
-    let seed = 12345;
-    function fixedRandom() {
-        seed = (seed * 9301 + 49297) % 233280;
-        return seed / 233280;
-    }
-    for (let t=0; t<nTickets; t++) {
-        let selected = [], available = [...top20], weights = available.map(v => Math.max(final[v], 0.01));
-        for (let s=0; s<6; s++) {
+    // 生成 nTickets 注，每注從核心池中按分數加權選出6個不重複號碼
+    for (let t = 0; t < nTickets; t++) {
+        let pool = [...corePool];
+        let weights = pool.map(v => Math.max(final[v], 0.01));
+        let selected = [];
+        for (let s = 0; s < 6; s++) {
             let total = weights.reduce((a,b)=>a+b,0);
-            let rand = fixedRandom() * total;
+            let rand = Math.random() * total;
             let idx = 0, acc = 0;
-            while(acc + weights[idx] < rand && idx < weights.length-1) { acc += weights[idx]; idx++; }
-            selected.push(available[idx]);
-            available.splice(idx,1);
+            while (acc + weights[idx] < rand && idx < weights.length-1) {
+                acc += weights[idx];
+                idx++;
+            }
+            selected.push(pool[idx]);
+            pool.splice(idx,1);
             weights.splice(idx,1);
         }
         selected.sort((a,b)=>a-b);
@@ -583,11 +602,15 @@ async function renderSingle() {
         return;
     }
     const latest = rawData[0];
-    let recentHtml = '';
-    for (let i=0; i<Math.min(5, rawData.length); i++) {
-        const r = rawData[i];
-        recentHtml += `<div class="recent-item"><strong>${r.issue}</strong> ${r.n1},${r.n2},${r.n3},${r.n4},${r.n5},${r.n6}</div>`;
-    }
+  let recentHtml = '';
+for (let i=0; i<Math.min(5, rawData.length); i++) {
+    const r = rawData[i];
+    recentHtml += `<div class="recent-item">
+        <strong>${r.issue}</strong> ${r.n1},${r.n2},${r.n3},${r.n4},${r.n5},${r.n6}
+        <span style="margin-left: 8px;">特別號</span>
+        <span class="number-ball ball-red">${r.special}</span>
+    </div>`;
+}
     const html = `
         <div class="card">
             <div class="latest-box">
