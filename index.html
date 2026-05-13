@@ -683,7 +683,7 @@ async function renderReplica() {
     }
     
     let selectOptions = "";
-    for (let i = 7; i <= 20; i++) selectOptions += `<option value="${i}">${i} 個號碼</option>`;
+    for (let i = 7; i <= 20; i++) selectOptions += `<option value="${i}">${i} 個字</option>`;
     
     const html = `
         <div class="card">
@@ -825,7 +825,7 @@ async function renderCheck() {
     } else {
         for (let [code, rec] of list) {
             let modeName = rec.mode === 'single' ? '單式' : (rec.mode === 'replica' ? '複式' : '膽拖');
-            let details = rec.mode === 'single' ? `${rec.params.betCount}注` : (rec.mode === 'replica' ? `${rec.params.count}碼` : `${rec.params.danCount}膽+${rec.params.tuoCount}拖`);
+            let details = rec.mode === 'single' ? `${rec.params.betCount}注` : (rec.mode === 'replica' ? `${rec.params.count}個字` : `${rec.params.danCount}膽+${rec.params.tuoCount}腳`);
             const daysOld = Math.floor((now - new Date(rec.timestamp).getTime()) / (24*60*60*1000));
             const daysLeft = 90 - daysOld;
             historyHtml += `<div class="history-item">
