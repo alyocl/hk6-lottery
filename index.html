@@ -606,10 +606,10 @@ async function renderSingle() {
 for (let i=0; i<Math.min(5, rawData.length); i++) {
     const r = rawData[i];
     recentHtml += `<div class="recent-item">
-        <strong>${r.issue}</strong> ${r.n1},${r.n2},${r.n3},${r.n4},${r.n5},${r.n6}
-        <span style="margin-left: 8px;">特別號</span>
-        <span class="number-ball ball-red">${r.special}</span>
-    </div>`;
+    <strong>${r.issue}</strong> ${r.n1},${r.n2},${r.n3},${r.n4},${r.n5},${r.n6}
+    <span style="margin-left: 8px;">特別號碼</span>
+    <span style="display: inline-block; width: 2rem; text-align: center; font-weight: bold;">${r.special}</span>
+</div>`;
 }
     const html = `
         <div class="card">
