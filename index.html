@@ -653,26 +653,47 @@ for (let i=0; i<Math.min(5, rawData.length); i++) {
     `;
     document.getElementById('mainApp').innerHTML = html;
     
-    document.getElementById('predictBtn').onclick = () => {
-        const betVal = parseInt(document.getElementById('betSelect').value);
-        const tickets = predictTicketsFixed(rawData, betVal);
-        const result = savePrediction('single', { betCount: betVal }, tickets);
-        let alertHtml = '';
-        if (!result.isNew) {
-            alertHtml = `<div class="code-box" style="background:#fef3c7; border-color:#f97316;">
-                            ⚠️ 本期已預測 祝你好運<br>
-                            📌 核對碼：<span class="code" style="font-size:1.2rem;">${result.code}</span>
-                        </div>`;
+document.getElementById('predictBtn').onclick = () => {
+    const betVal = parseInt(document.getElementById('betSelect').value);
+    const params = { betCount: betVal };
+    
+    // 1. 檢查是否已有相同記錄（同一期、同一玩法、同一注數）
+    let existingEntry = null;
+    for (let [code, rec] of Object.entries(checkRecords)) {
+        if (rec.mode === 'single' && rec.issue === currentIssueKey && JSON.stringify(rec.params) === JSON.stringify(params)) {
+            existingEntry = { code, data: rec.data };
+            break;
         }
-        let resultHtml = `<div><strong>🎯 預測 ${betVal} 注</strong></div>`;
-        tickets.forEach((t,i) => resultHtml += `<div class="ticket-row">注 ${i+1}： ${t.join(', ')}</div>`);
-        if (result.isNew) {
-            resultHtml += `<div class="code-box"><div>📌 您的核對碼</div><div class="code">${result.code}</div><div style="font-size:0.8rem;">💡 開獎後到「核對中獎」輸入此碼</div></div>`;
-        } else {
-            resultHtml += alertHtml;
-        }
-        document.getElementById('resultPanel').innerHTML = resultHtml;
-    };
+    }
+    
+    let tickets, result;
+    if (existingEntry) {
+        // 已有記錄：直接使用儲存的號碼，核對碼沿用舊的
+        tickets = existingEntry.data;
+        result = { code: existingEntry.code, isNew: false };
+    } else {
+        // 無記錄：生成新預測並儲存
+        tickets = predictTicketsFixed(rawData, betVal);
+        result = savePrediction('single', params, tickets);
+    }
+    
+    // 2. 顯示結果（與原來相同）
+    let alertHtml = '';
+    if (!result.isNew) {
+        alertHtml = `<div class="code-box" style="background:#fef3c7; border-color:#f97316;">
+                        ⚠️ 本期已預測 祝你好運<br>
+                        📌 核對碼：<span class="code" style="font-size:1.2rem;">${result.code}</span>
+                    </div>`;
+    }
+    let resultHtml = `<div><strong>🎯 預測 ${betVal} 注</strong></div>`;
+    tickets.forEach((t, i) => resultHtml += `<div class="ticket-row">注 ${i+1}： ${t.join(', ')}</div>`);
+    if (result.isNew) {
+        resultHtml += `<div class="code-box"><div>📌 您的核對碼</div><div class="code">${result.code}</div><div style="font-size:0.8rem;">💡 開獎後到「核對中獎」輸入此碼</div></div>`;
+    } else {
+        resultHtml += alertHtml;
+    }
+    document.getElementById('resultPanel').innerHTML = resultHtml;
+};
 }
 
 // ==================== 複式模式 ====================
