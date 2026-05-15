@@ -430,11 +430,155 @@
     }
 
     // ========== 核對中獎模式 (保留原有邏輯，略) ==========
-    async function renderCheck() {
-        // 為節省篇幅，此處可保留你原本的 renderCheck 內容，或者暫時簡單顯示提示。
-        // 此處略，可後續補充。
-        document.getElementById('mainApp').innerHTML = `<div class="card">核對中獎模式待完善</div>`;
+ // ==================== 核對中獎模式 ====================
+async function renderCheck() {
+    loadCheckRecords();
+    const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    let cleanedCount = 0;
+    for (let code in checkRecords) {
+        const timestamp = new Date(checkRecords[code].timestamp).getTime();
+        if (now - timestamp > THREE_MONTHS_MS) {
+            delete checkRecords[code];
+            cleanedCount++;
+        }
     }
+    if (cleanedCount > 0) saveCheckRecords();
+    
+    let historyHtml = '';
+    const list = Object.entries(checkRecords).reverse();
+    if (list.length === 0) {
+        historyHtml = '<div style="text-align:center; color:#666;">📭 暫無核對記錄（系統只保留最近3個月）</div>';
+    } else {
+        for (let [code, rec] of list) {
+            let modeName = rec.mode === 'single' ? '單式' : (rec.mode === 'replica' ? '複式' : '膽拖');
+            let details = rec.mode === 'single' ? `${rec.params.betCount}注` : (rec.mode === 'replica' ? `${rec.params.count}個字` : `${rec.params.danCount}膽+${rec.params.tuoCount}腳`);
+            const daysOld = Math.floor((now - new Date(rec.timestamp).getTime()) / (24*60*60*1000));
+            const daysLeft = 90 - daysOld;
+            historyHtml += `<div class="history-item">
+                <strong>🔑 ${code}</strong> - ${modeName} (${details})<br>
+                <span style="font-size:0.75rem;">📅 ${new Date(rec.timestamp).toLocaleString()} · 剩餘 ${daysLeft} 天</span>
+                ${rec.checked ? '<span style="float:right; color:#10b981;">✅ 已核對</span>' : ''}
+            </div>`;
+        }
+    }
+    const infoHtml = `<div style="background:#eef2ff; border-radius:1rem; padding:0.8rem; margin-bottom:1rem; text-align:center; font-size:0.8rem;">
+        ⏰ 系統只保留 <strong>最近3個月</strong> 的核對記錄，超過90天會自動清除。
+    </div>`;
+    
+    const html = `
+        <div class="card">
+            <div><strong>🔍 輸入核對碼與開獎號碼</strong></div>
+            <div class="bet-selector"><label>📌 核對碼：</label><input type="text" id="checkCode" placeholder="例如 A3B9X7" style="padding:10px; width:150px; text-align:center;"></div>
+            <div class="bet-selector"><label>🎲 攪出號碼 (6個)：</label><input type="text" id="drawNumbers" placeholder="5,18,22,31,44,48" style="width:100%; padding:10px;"></div>
+            <div class="bet-selector"><label>⭐ 特別號碼 (1個)：</label><input type="text" id="specialNumber" placeholder="9" style="width:100%; padding:10px;"></div>
+            <button id="doCheckBtn">🔍 核對中獎</button>
+            <div id="checkResult"></div>
+        </div>
+        <div class="card">
+            <strong>📋 您的核對記錄 (最近3個月)</strong>
+            ${infoHtml}
+            <div style="max-height:300px; overflow-y:auto; margin-top:10px;">${historyHtml}</div>
+        </div>
+    `;
+    document.getElementById('mainApp').innerHTML = html;
+    
+    document.getElementById('doCheckBtn').onclick = () => {
+        const code = document.getElementById('checkCode').value.trim().toUpperCase();
+        const drawInput = document.getElementById('drawNumbers').value.trim();
+        const specialInput = document.getElementById('specialNumber').value.trim();
+        if (!code) { alert('請輸入核對碼'); return; }
+        if (!drawInput) { alert('請輸入攪出號碼'); return; }
+        if (!specialInput) { alert('請輸入特別號碼'); return; }
+        const drawNumbers = drawInput.split(',').map(n => parseInt(n.trim(), 10));
+        const specialNumber = parseInt(specialInput, 10);
+        if (drawNumbers.length !== 6 || drawNumbers.some(isNaN)) { alert('請輸入6個攪出號碼，用逗號分隔'); return; }
+        if (isNaN(specialNumber) || specialNumber < 1 || specialNumber > 49) { alert('請輸入1-49之間的特別號碼'); return; }
+        
+        const record = checkRecords[code];
+        if (!record) {
+            document.getElementById('checkResult').innerHTML = `<div class="error-box">❌ 核對碼無效<br><span style="font-size:0.8rem;">可能原因：核對碼錯誤、記錄已超過3個月被清除</span></div>`;
+            return;
+        }
+        const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        const timestamp = new Date(record.timestamp).getTime();
+        if (now - timestamp > THREE_MONTHS_MS) {
+            delete checkRecords[code];
+            saveCheckRecords();
+            document.getElementById('checkResult').innerHTML = `<div class="error-box">❌ 此核對碼記錄已超過3個月，已被系統自動清除，無法核對</div>`;
+            setTimeout(() => renderCheck(), 1500);
+            return;
+        }
+        
+        let resultHtml = `<div class="code-box" style="background:#d1fae5;">`;
+        resultHtml += `<div>🎯 核對結果</div>`;
+        
+        if (record.mode === 'single') {
+            let anyPrize = false;
+            const hasSpecialMatch = (record.special === specialNumber);
+            for (let i = 0; i < record.data.length; i++) {
+                const ticket = record.data[i];
+                const hitNumbers = ticket.filter(n => drawNumbers.includes(n));
+                const hitCount = hitNumbers.length;
+                let prizeText = '';
+                if (hitCount === 6) { prizeText = '🏆 頭獎'; anyPrize = true; }
+                else if (hitCount === 5 && hasSpecialMatch) { prizeText = '🎉 二獎'; anyPrize = true; }
+                else if (hitCount === 5) { prizeText = '🎉 三獎'; anyPrize = true; }
+                else if (hitCount === 4 && hasSpecialMatch) { prizeText = '🎉 四獎 ($9,600)'; anyPrize = true; }
+                else if (hitCount === 4) { prizeText = '🎉 五獎 ($640)'; anyPrize = true; }
+                else if (hitCount === 3 && hasSpecialMatch) { prizeText = '🎉 六獎 ($320)'; anyPrize = true; }
+                else if (hitCount === 3) { prizeText = '🎉 七獎 ($40)'; anyPrize = true; }
+                else { prizeText = '未中獎'; }
+                const hitDisplay = hitNumbers.length ? hitNumbers.join(', ') : '無';
+                resultHtml += `<div>📌 注 ${i+1}：中獎號碼 ${hitDisplay} → ${prizeText}</div>`;
+            }
+            if (!anyPrize && !hasSpecialMatch) {
+                resultHtml += `<div>❌ 未中獎</div>`;
+            } else if (!anyPrize && hasSpecialMatch) {
+                resultHtml += `<div>⚠️ 僅中特別號碼（無派彩）</div>`;
+            }
+        } 
+        else if (record.mode === 'replica') {
+            const recommendedNumbers = record.data.slice();
+            const hitNumbers = [...new Set(recommendedNumbers.filter(n => drawNumbers.includes(n)))];
+            const matchCount = hitNumbers.length;
+            let prizeText = '';
+            if (matchCount >= 6) prizeText = '🏆 恭喜中頭獎！';
+            else if (matchCount === 5) prizeText = '🎉 中三獎';
+            else if (matchCount === 4) prizeText = '🎉 中五獎 ($640)';
+            else if (matchCount === 3) prizeText = '🎉 中七獎 ($40)';
+            else prizeText = '❌ 未中獎';
+            const hitDisplay = hitNumbers.length ? hitNumbers.join(', ') : '無';
+            resultHtml += `<div>中獎預測號碼：${hitDisplay}</div>`;
+            resultHtml += `<div>${prizeText}</div>`;
+        } 
+        else {
+            const recommendedNumbers = [...record.data.dan, ...record.data.tuo];
+            const hitNumbers = [...new Set(recommendedNumbers.filter(n => drawNumbers.includes(n)))];
+            const mainHit = hitNumbers.length;
+            const hasSpecialMatch = (record.special === specialNumber);
+            let prizeText = '';
+            if (mainHit === 6) prizeText = '🏆 恭喜中頭獎！';
+            else if (mainHit === 5 && hasSpecialMatch) prizeText = '🎉 中二獎';
+            else if (mainHit === 5) prizeText = '🎉 中三獎';
+            else if (mainHit === 4 && hasSpecialMatch) prizeText = '🎉 中四獎 ($9,600)';
+            else if (mainHit === 4) prizeText = '🎉 中五獎 ($640)';
+            else if (mainHit === 3 && hasSpecialMatch) prizeText = '🎉 中六獎 ($320)';
+            else if (mainHit === 3) prizeText = '🎉 中七獎 ($40)';
+            else prizeText = '❌ 未中獎';
+            const hitDisplay = hitNumbers.length ? hitNumbers.join(', ') : '無';
+            resultHtml += `<div>中獎號碼：${hitDisplay}</div>`;
+            resultHtml += `<div>特別號碼：${hasSpecialMatch ? '✅ 中' : '❌ 不中'}</div>`;
+            resultHtml += `<div>${prizeText}</div>`;
+        }
+        
+        resultHtml += `</div>`;
+        document.getElementById('checkResult').innerHTML = resultHtml;
+        record.checked = true;
+        saveCheckRecords();
+    };
+}
 
     // ========== 切換模式 ==========
     function switchMode(mode) {
