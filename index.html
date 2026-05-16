@@ -108,7 +108,7 @@
 </div>
 
 <script type="module">
-    import { predictTicketsFixed } from './predict.js';
+    import { predictTicketsFixed, getTopNumbersByScore } from './predict.js';
 
     // ========== 全域變數 ==========
     const API_KEY = 'AIzaSyCmpR7qGwgfE3y7XIS-O1_cny_iBsDa7No';
@@ -347,7 +347,7 @@
         
         document.getElementById('generateReplicaBtn').onclick = () => {
             const count = parseInt(document.getElementById('replicaCountSelect').value);
-            const topNumbers = getTopNumbers(rawData, count);
+            const topNumbers = getTopNumbersByScore(rawData, count);
             const comboCount = combination(count, 6);
             const totalAmount = comboCount * currentPrice;
             const result = savePrediction('replica', { count, price: currentPrice }, topNumbers);
@@ -410,8 +410,8 @@
         document.getElementById('generateDanTuoBtn').onclick = () => {
             const danCount = parseInt(document.getElementById('danCountSelect').value);
             const tuoCount = parseInt(document.getElementById('tuoCountSelect').value);
-            const danNumbers = getTopNumbers(rawData, danCount);
-            const tuoNumbers = getTopNumbers(rawData, tuoCount, danNumbers);
+            const danNumbers = getTopNumbersByScore(rawData, danCount);
+            const tuoNumbers = getTopNumbersByScore(rawData, tuoCount, danNumbers);
             const needFromTuo = 6 - danCount;
             const comboCount = combination(tuoCount, needFromTuo);
             const totalAmount = comboCount * currentPrice;
