@@ -21,7 +21,6 @@
         .error-box { background: #fee2e2; border-radius: 1rem; padding: 1rem; text-align: center; color: #dc2626; }
         .version-legend { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 15px; justify-content: center; }
         .version-marker { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; }
-        .version-marker .line { width: 30px; height: 2px; background: #f97316; }
         .version-marker .line-dash { width: 30px; height: 2px; background: repeating-linear-gradient(90deg, #f97316, #f97316 5px, transparent 5px, transparent 10px); }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -53,11 +52,10 @@
     // ==================== 配置：模型修正時間點 (YYYY-MM-DD 及說明) ====================
     const VERSION_MARKERS = [
         { date: "2026-05-17", label: "統一評分模型上線" },
-        // 未來可繼續增加，例如：
-        // { date: "2026-05-24", label: "調整冷熱權重" }
+        // 可繼續增加，例如 { date: "2026-05-24", label: "調整冷熱權重" }
     ];
 
-    // ==================== 以下為數據讀取與圖表繪製邏輯 ====================
+    // ==================== 數據讀取與圖表繪製邏輯 ====================
     const API_KEY = 'AIzaSyCmpR7qGwgfE3y7XIS-O1_cny_iBsDa7No';
     const RESULT_SHEET_ID = '1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw';
     const RESULT_RANGE = 'sheet1!A:H';
@@ -65,7 +63,7 @@
     const PREDICT_RANGE = 'Form Responses 1!A:F';
 
     let resultMap = new Map();
-    let predictions = [];
+    let predictions = [];   // 儲存有效的預測記錄
 
     async function loadResults() {
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${RESULT_SHEET_ID}/values/${RESULT_RANGE}?key=${API_KEY}`;
@@ -106,7 +104,10 @@
         for (let i = 1; i < data.values.length; i++) {
             const row = data.values[i];
             if (row.length < 6) continue;
-            const timestamp = row[0];
+            const timestampStr = row[0];
+            if (!timestampStr) continue;
+            const ts = new Date(timestampStr);
+            if (isNaN(ts.getTime())) continue; // 無效日期跳過
             const mode = row[2];
             const recStr = row[4];
             const issueKey = row[5];
@@ -116,7 +117,7 @@
             const rec = parseRecommendations(recStr, mode);
             if (!rec) continue;
             predictions.push({
-                timestamp: new Date(timestamp),
+                timestamp: ts,
                 mode,
                 rec,
                 resultNumbers: result.numbers,
@@ -127,7 +128,7 @@
     }
 
     function computeDailyHitRate() {
-        const dailyData = new Map();
+        const dailyData = new Map(); // key: YYYY-MM-DD, value: { totalTickets, hitTickets }
         for (let p of predictions) {
             if (p.mode !== 'single') continue;
             const dateStr = p.timestamp.toISOString().slice(0,10);
@@ -145,7 +146,7 @@
         return { labels, rates };
     }
 
-    // 自定義插件：在指定日期繪製垂直虛線和文字
+    // 自定義插件：繪製垂直虛線
     const verticalLinePlugin = {
         id: 'verticalLines',
         afterDraw(chart, args, options) {
@@ -179,19 +180,17 @@
             await loadPredictions();
             const { labels, rates } = computeDailyHitRate();
             const rateNumbers = rates.map(r => parseFloat(r));
-            
-            // 將 VERSION_MARKERS 轉換為 chart.js 插件可用的格式，只保留 labels 中存在的日期
+
+            // 過濾模型標記，只保留在 labels 中存在的日期
             const markers = [];
             for (let m of VERSION_MARKERS) {
                 if (labels.includes(m.date)) {
                     markers.push({ date: m.date, label: m.label, color: '#f97316' });
                 } else {
-                    // 如果日期不在 x 軸上（無預測記錄），可以忽略或提示
                     console.warn(`標記日期 ${m.date} 不在圖表範圍內，未繪製虛線`);
                 }
             }
-            
-            // 繪製圖表
+
             const ctx = document.getElementById('trendChart').getContext('2d');
             new Chart(ctx, {
                 type: 'line',
@@ -212,46 +211,29 @@
                     responsive: true,
                     maintainAspectRatio: true,
                     plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: (ctx) => `${ctx.raw}%`
-                            }
-                        },
-                        legend: { position: 'top' }
+                        tooltip: { callbacks: { label: (ctx) => `${ctx.raw}%` } },
+                        legend: { position: 'top' },
+                        verticalLines: { markers }  // 傳遞 markers 給插件
                     },
                     scales: {
-                        y: {
-                            title: { display: true, text: '命中率 (%)', color: '#475569' },
-                            min: 0,
-                            max: 100,
-                            ticks: { callback: (val) => `${val}%` }
-                        },
-                        x: {
-                            title: { display: true, text: '日期', color: '#475569' }
-                        }
+                        y: { title: { display: true, text: '命中率 (%)', color: '#475569' }, min: 0, max: 100, ticks: { callback: (val) => `${val}%` } },
+                        x: { title: { display: true, text: '日期', color: '#475569' } }
                     }
                 },
-                plugins: [verticalLinePlugin],
-                pluginOptions: { verticalLines: { markers } }
+                plugins: [verticalLinePlugin]
             });
-            
-            // 在圖表實例上設置 markers（因為 plugin 讀取 options.markers，需要另一種方式傳遞）
-            // 上面使用 plugin options 的方式不直接，改用 chart.config.options 中的自定義屬性
-            const chart = Chart.getChart('trendChart');
-            if (chart) {
-                chart.config.options.plugins.verticalLines = { markers };
-                // 重新觸發繪製
-                chart.update();
-            }
-            
+
             // 更新圖例說明
             const legendDiv = document.getElementById('legendContainer');
             if (legendDiv && markers.length) {
                 legendDiv.innerHTML = markers.map(m => `<div class="version-marker"><div class="line-dash"></div> <span>${m.label} (${m.date})</span></div>`).join('');
+            } else if (legendDiv) {
+                legendDiv.innerHTML = '<div class="version-marker">暫無模型修正標記</div>';
             }
-            
+
             document.getElementById('updateTime').innerText = `最後更新：${new Date().toLocaleString()}`;
-            document.getElementById('statsContent').innerHTML = `<div class="stats-summary"><strong>總體命中率統計</strong><br>共分析 ${predictions.filter(p=>p.mode==='single').length} 筆預測記錄，每日趨勢如上圖。</div>`;
+            const totalSinglePredictions = predictions.filter(p => p.mode === 'single').length;
+            document.getElementById('statsContent').innerHTML = `<div class="stats-summary"><strong>總體命中率統計</strong><br>共分析 ${totalSinglePredictions} 筆預測記錄（單式注數），每日趨勢如上圖。</div>`;
         } catch (err) {
             console.error(err);
             document.getElementById('statsContent').innerHTML = `<div class="error-box">❌ 載入失敗：${err.message}</div>`;
