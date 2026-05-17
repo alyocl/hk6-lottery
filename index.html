@@ -20,7 +20,6 @@
     <meta name="revisit-after" content="1 days">
     <title>六合彩 AI 分析系統 | 智能預測</title>
     <style>
-        /* 樣式保持不變，與你原本相同，此處省略重複內容 */
         * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans TC', sans-serif; }
         body { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); margin: 0; padding: 20px; min-height: 100vh; }
         .container { max-width: 750px; margin: 0 auto; background: rgba(255,255,255,0.1); backdrop-filter: blur(2px); border-radius: 2rem; padding: 1.5rem; box-shadow: 0 20px 35px -10px rgba(0,0,0,0.4); }
@@ -62,6 +61,9 @@
         .footer-links a { color: #f97316; text-decoration: none; margin: 0 10px; font-size: 0.8rem; }
         .footer-links a:hover { text-decoration: underline; }
         .responsible-gambling { margin-top: 1rem; }
+        /* 选号球样式 */
+        .select-ball { transition: 0.1s; user-select: none; }
+        .select-ball:hover { transform: scale(1.05); }
     </style>
     <script type="application/ld+json">
 {
@@ -122,7 +124,7 @@
     // ========== 核對碼儲存 ==========
     function loadCheckRecords() {
         const saved = localStorage.getItem('lottery_check_records');
-        if (saved) try { checkRecords = JSON.parse(saved); } catch(e) {}
+        if (saved) try { checkRecords = JSON.parse(saved); } catch(e) { console.error(e); }
     }
     function saveCheckRecords() {
         localStorage.setItem('lottery_check_records', JSON.stringify(checkRecords));
@@ -138,8 +140,16 @@
         const latest = dataSeries[0];
         return `${latest.n1},${latest.n2},${latest.n3},${latest.n4},${latest.n5},${latest.n6}|${latest.special}`;
     }
+    // 從 issueKey 解析特別號
+    function getSpecialFromIssueKey(key) {
+        if (!key) return null;
+        const parts = key.split('|');
+        if (parts.length === 2) return parseInt(parts[1], 10);
+        return null;
+    }
     function savePrediction(mode, params, data) {
         let code, isNew;
+        const currentSpecial = getSpecialFromIssueKey(currentIssueKey);
         const existingEntry = Object.entries(checkRecords).find(([key, record]) => {
             return record.mode === mode && record.issue === currentIssueKey && JSON.stringify(record.params) === JSON.stringify(params);
         });
@@ -150,12 +160,13 @@
             code = generateCheckCode();
             checkRecords[code] = {
                 mode, params, data, issue: currentIssueKey,
+                special: currentSpecial,
                 timestamp: new Date().toISOString(), checked: false
             };
             saveCheckRecords();
             isNew = true;
         }
-        // 提交到 Google Form (略，保持原有)
+        // 提交到 Google Form
         const FORM_ACTION = 'https://docs.google.com/forms/d/e/1FAIpQLSeYkeOO3JHFx7lIz-4YjF3yQ7eHUQHPh2QRQDleD0jnYS_mhQ/formResponse';
         const iframe = document.createElement('iframe');
         iframe.name = 'hidden-frame';
@@ -310,7 +321,7 @@
         };
     }
 
-    // ========== 複式模式 (簡單版) ==========
+    // ========== 複式模式 ==========
     async function renderReplica() {
         if (!rawData || rawData.length === 0) {
             document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 數據載入失敗</div>`;
@@ -332,19 +343,6 @@
         document.getElementById('price5Btn').onclick = () => { currentPrice = 5; document.getElementById('price5Btn').classList.add('active'); document.getElementById('price10Btn').classList.remove('active'); };
         document.getElementById('price10Btn').onclick = () => { currentPrice = 10; document.getElementById('price10Btn').classList.add('active'); document.getElementById('price5Btn').classList.remove('active'); };
         
-        function getTopNumbersFallback(dataSeries, count, exclude = []) {
-            const freq = new Array(50).fill(0);
-            for (let i=0; i<dataSeries.length; i++) {
-                const row = dataSeries[i];
-                for (let col of ['n1','n2','n3','n4','n5','n6']) freq[row[col]]++;
-            }
-            let candidates = Array.from({length:49}, (_,i)=>i+1);
-            candidates = candidates.filter(c => !exclude.includes(c));
-            candidates.sort((a,b) => freq[b] - freq[a]);
-            return candidates.slice(0, count).sort((a,b)=>a-b);
-        }
-        const getTopNumbers = getTopNumbersFallback;
-        
         document.getElementById('generateReplicaBtn').onclick = () => {
             const count = parseInt(document.getElementById('replicaCountSelect').value);
             const topNumbers = getTopNumbersByScore(rawData, count);
@@ -363,7 +361,7 @@
         };
     }
 
-    // ========== 膽拖模式 (簡單版) ==========
+    // ========== 膽拖模式 ==========
     async function renderDanTuo() {
         if (!rawData || rawData.length === 0) {
             document.getElementById('mainApp').innerHTML = `<div class="card error-box">❌ 數據載入失敗</div>`;
@@ -395,18 +393,7 @@
         document.getElementById('danPrice5Btn').onclick = () => { currentPrice = 5; document.getElementById('danPrice5Btn').classList.add('active'); document.getElementById('danPrice10Btn').classList.remove('active'); };
         document.getElementById('danPrice10Btn').onclick = () => { currentPrice = 10; document.getElementById('danPrice10Btn').classList.add('active'); document.getElementById('danPrice5Btn').classList.remove('active'); };
         document.getElementById('danCountSelect').onchange = updateTuo;
-        function getTopNumbersFallback(dataSeries, count, exclude = []) {
-            const freq = new Array(50).fill(0);
-            for (let i=0; i<dataSeries.length; i++) {
-                const row = dataSeries[i];
-                for (let col of ['n1','n2','n3','n4','n5','n6']) freq[row[col]]++;
-            }
-            let candidates = Array.from({length:49}, (_,i)=>i+1);
-            candidates = candidates.filter(c => !exclude.includes(c));
-            candidates.sort((a,b) => freq[b] - freq[a]);
-            return candidates.slice(0, count).sort((a,b)=>a-b);
-        }
-        const getTopNumbers = getTopNumbersFallback;
+        
         document.getElementById('generateDanTuoBtn').onclick = () => {
             const danCount = parseInt(document.getElementById('danCountSelect').value);
             const tuoCount = parseInt(document.getElementById('tuoCountSelect').value);
@@ -429,156 +416,212 @@
         updateTuo();
     }
 
-    // ========== 核對中獎模式 (保留原有邏輯，略) ==========
- // ==================== 核對中獎模式 ====================
-async function renderCheck() {
-    loadCheckRecords();
-    const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
-    const now = Date.now();
-    let cleanedCount = 0;
-    for (let code in checkRecords) {
-        const timestamp = new Date(checkRecords[code].timestamp).getTime();
-        if (now - timestamp > THREE_MONTHS_MS) {
-            delete checkRecords[code];
-            cleanedCount++;
-        }
-    }
-    if (cleanedCount > 0) saveCheckRecords();
-    
-    let historyHtml = '';
-    const list = Object.entries(checkRecords).reverse();
-    if (list.length === 0) {
-        historyHtml = '<div style="text-align:center; color:#666;">📭 暫無核對記錄（系統只保留最近3個月）</div>';
-    } else {
-        for (let [code, rec] of list) {
-            let modeName = rec.mode === 'single' ? '單式' : (rec.mode === 'replica' ? '複式' : '膽拖');
-            let details = rec.mode === 'single' ? `${rec.params.betCount}注` : (rec.mode === 'replica' ? `${rec.params.count}個字` : `${rec.params.danCount}膽+${rec.params.tuoCount}腳`);
-            const daysOld = Math.floor((now - new Date(rec.timestamp).getTime()) / (24*60*60*1000));
-            const daysLeft = 90 - daysOld;
-            historyHtml += `<div class="history-item">
-                <strong>🔑 ${code}</strong> - ${modeName} (${details})<br>
-                <span style="font-size:0.75rem;">📅 ${new Date(rec.timestamp).toLocaleString()} · 剩餘 ${daysLeft} 天</span>
-                ${rec.checked ? '<span style="float:right; color:#10b981;">✅ 已核對</span>' : ''}
-            </div>`;
-        }
-    }
-    const infoHtml = `<div style="background:#eef2ff; border-radius:1rem; padding:0.8rem; margin-bottom:1rem; text-align:center; font-size:0.8rem;">
-        ⏰ 系統只保留 <strong>最近3個月</strong> 的核對記錄，超過90天會自動清除。
-    </div>`;
-    
-    const html = `
-        <div class="card">
-            <div><strong>🔍 輸入核對碼與開獎號碼</strong></div>
-            <div class="bet-selector"><label>📌 核對碼：</label><input type="text" id="checkCode" placeholder="例如 A3B9X7" style="padding:10px; width:150px; text-align:center;"></div>
-            <div class="bet-selector"><label>🎲 攪出號碼 (6個)：</label><input type="text" id="drawNumbers" placeholder="5,18,22,31,44,48" style="width:100%; padding:10px;"></div>
-            <div class="bet-selector"><label>⭐ 特別號碼 (1個)：</label><input type="text" id="specialNumber" placeholder="9" style="width:100%; padding:10px;"></div>
-            <button id="doCheckBtn">🔍 核對中獎</button>
-            <div id="checkResult"></div>
-        </div>
-        <div class="card">
-            <strong>📋 您的核對記錄 (最近3個月)</strong>
-            ${infoHtml}
-            <div style="max-height:300px; overflow-y:auto; margin-top:10px;">${historyHtml}</div>
-        </div>
-    `;
-    document.getElementById('mainApp').innerHTML = html;
-    
-    document.getElementById('doCheckBtn').onclick = () => {
-        const code = document.getElementById('checkCode').value.trim().toUpperCase();
-        const drawInput = document.getElementById('drawNumbers').value.trim();
-        const specialInput = document.getElementById('specialNumber').value.trim();
-        if (!code) { alert('請輸入核對碼'); return; }
-        if (!drawInput) { alert('請輸入攪出號碼'); return; }
-        if (!specialInput) { alert('請輸入特別號碼'); return; }
-        const drawNumbers = drawInput.split(',').map(n => parseInt(n.trim(), 10));
-        const specialNumber = parseInt(specialInput, 10);
-        if (drawNumbers.length !== 6 || drawNumbers.some(isNaN)) { alert('請輸入6個攪出號碼，用逗號分隔'); return; }
-        if (isNaN(specialNumber) || specialNumber < 1 || specialNumber > 49) { alert('請輸入1-49之間的特別號碼'); return; }
-        
-        const record = checkRecords[code];
-        if (!record) {
-            document.getElementById('checkResult').innerHTML = `<div class="error-box">❌ 核對碼無效<br><span style="font-size:0.8rem;">可能原因：核對碼錯誤、記錄已超過3個月被清除</span></div>`;
-            return;
-        }
+    // ========== 核對中獎模式（點選號碼，特別號下拉） ==========
+    async function renderCheck() {
+        loadCheckRecords();
         const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
         const now = Date.now();
-        const timestamp = new Date(record.timestamp).getTime();
-        if (now - timestamp > THREE_MONTHS_MS) {
-            delete checkRecords[code];
-            saveCheckRecords();
-            document.getElementById('checkResult').innerHTML = `<div class="error-box">❌ 此核對碼記錄已超過3個月，已被系統自動清除，無法核對</div>`;
-            setTimeout(() => renderCheck(), 1500);
-            return;
+        let cleanedCount = 0;
+        for (let code in checkRecords) {
+            const timestamp = new Date(checkRecords[code].timestamp).getTime();
+            if (now - timestamp > THREE_MONTHS_MS) {
+                delete checkRecords[code];
+                cleanedCount++;
+            }
+        }
+        if (cleanedCount > 0) saveCheckRecords();
+        
+        let historyHtml = '';
+        const list = Object.entries(checkRecords).reverse();
+        if (list.length === 0) {
+            historyHtml = '<div style="text-align:center; color:#666;">📭 暫無核對記錄（系統只保留最近3個月）</div>';
+        } else {
+            for (let [code, rec] of list) {
+                let modeName = rec.mode === 'single' ? '單式' : (rec.mode === 'replica' ? '複式' : '膽拖');
+                let details = rec.mode === 'single' ? `${rec.params.betCount}注` : (rec.mode === 'replica' ? `${rec.params.count}個字` : `${rec.params.danCount}膽+${rec.params.tuoCount}腳`);
+                const daysOld = Math.floor((now - new Date(rec.timestamp).getTime()) / (24*60*60*1000));
+                const daysLeft = 90 - daysOld;
+                historyHtml += `<div class="history-item">
+                    <strong>🔑 ${code}</strong> - ${modeName} (${details})<br>
+                    <span style="font-size:0.75rem;">📅 ${new Date(rec.timestamp).toLocaleString()} · 剩餘 ${daysLeft} 天</span>
+                    ${rec.checked ? '<span style="float:right; color:#10b981;">✅ 已核對</span>' : ''}
+                </div>`;
+            }
+        }
+        const infoHtml = `<div style="background:#eef2ff; border-radius:1rem; padding:0.8rem; margin-bottom:1rem; text-align:center; font-size:0.8rem;">
+            ⏰ 系統只保留 <strong>最近3個月</strong> 的核對記錄，超過90天會自動清除。
+        </div>`;
+
+        // 產生 1-49 號碼按鈕 (每行7個)
+        let ballsHtml = '<div style="display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 15px 0;">';
+        for (let i = 1; i <= 49; i++) {
+            ballsHtml += `<span data-num="${i}" class="number-ball select-ball" style="cursor:pointer; background-color:#e2e8f0; color:#1e293b; text-shadow:none;">${i}</span>`;
+            if (i % 7 === 0) ballsHtml += '<div style="width:100%;"></div>';
+        }
+        ballsHtml += '</div>';
+        
+        // 特別號下拉選單
+        let specialOptions = '';
+        for (let i = 1; i <= 49; i++) specialOptions += `<option value="${i}">${i}</option>`;
+        
+        const html = `
+            <div class="card">
+                <div><strong>🔍 輸入核對碼與開獎號碼</strong></div>
+                <div class="bet-selector"><label>📌 核對碼：</label><input type="text" id="checkCode" placeholder="例如 A3B9X7" style="padding:10px; width:150px; text-align:center;"></div>
+                <div class="bet-selector">
+                    <label>🎲 攪出號碼（點選6個）：</label>
+                    ${ballsHtml}
+                    <div id="selectedNumbersDisplay" style="margin-top:10px; font-weight:bold; color:#f97316;">已選：</div>
+                    <div id="selectedWarning" style="color:red; font-size:0.8rem;"></div>
+                </div>
+                <div class="bet-selector">
+                    <label>⭐ 特別號碼：</label>
+                    <select id="specialNumberSelect" style="padding:10px; font-size:1rem;">${specialOptions}</select>
+                </div>
+                <button id="doCheckBtn">🔍 核對中獎</button>
+                <div id="checkResult"></div>
+            </div>
+            <div class="card">
+                <strong>📋 您的核對記錄 (最近3個月)</strong>
+                ${infoHtml}
+                <div style="max-height:300px; overflow-y:auto; margin-top:10px;">${historyHtml}</div>
+            </div>
+        `;
+        document.getElementById('mainApp').innerHTML = html;
+        
+        // 點選號碼邏輯 (最多6個)
+        let selectedNumbers = [];
+        const displayDiv = document.getElementById('selectedNumbersDisplay');
+        const warningDiv = document.getElementById('selectedWarning');
+        const balls = document.querySelectorAll('.select-ball');
+        
+        function updateDisplay() {
+            displayDiv.innerText = '已選：' + (selectedNumbers.length ? selectedNumbers.join(', ') : '無');
+            if (selectedNumbers.length === 6) warningDiv.innerText = '已選滿6個號碼';
+            else warningDiv.innerText = '';
+            balls.forEach(ball => {
+                const num = parseInt(ball.getAttribute('data-num'));
+                if (selectedNumbers.includes(num)) {
+                    ball.style.backgroundColor = '#f97316';
+                    ball.style.color = 'white';
+                } else {
+                    ball.style.backgroundColor = '#e2e8f0';
+                    ball.style.color = '#1e293b';
+                }
+            });
         }
         
-        let resultHtml = `<div class="code-box" style="background:#d1fae5;">`;
-        resultHtml += `<div>🎯 核對結果</div>`;
+        balls.forEach(ball => {
+            ball.addEventListener('click', () => {
+                const num = parseInt(ball.getAttribute('data-num'));
+                if (selectedNumbers.includes(num)) {
+                    selectedNumbers = selectedNumbers.filter(n => n !== num);
+                } else {
+                    if (selectedNumbers.length < 6) {
+                        selectedNumbers.push(num);
+                    } else {
+                        warningDiv.innerText = '最多只能選擇 6 個號碼';
+                        return;
+                    }
+                }
+                selectedNumbers.sort((a,b)=>a-b);
+                updateDisplay();
+            });
+        });
         
-        if (record.mode === 'single') {
-            let anyPrize = false;
-            const hasSpecialMatch = (record.special === specialNumber);
-            for (let i = 0; i < record.data.length; i++) {
-                const ticket = record.data[i];
-                const hitNumbers = ticket.filter(n => drawNumbers.includes(n));
-                const hitCount = hitNumbers.length;
+        document.getElementById('doCheckBtn').onclick = () => {
+            const code = document.getElementById('checkCode').value.trim().toUpperCase();
+            const specialNumber = parseInt(document.getElementById('specialNumberSelect').value, 10);
+            if (!code) { alert('請輸入核對碼'); return; }
+            if (selectedNumbers.length !== 6) { alert('請點選 6 個攪出號碼'); return; }
+            
+            const drawNumbers = selectedNumbers;
+            
+            const record = checkRecords[code];
+            if (!record) {
+                document.getElementById('checkResult').innerHTML = `<div class="error-box">❌ 核對碼無效<br><span style="font-size:0.8rem;">可能原因：核對碼錯誤、記錄已超過3個月被清除</span></div>`;
+                return;
+            }
+            const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+            const timestamp = new Date(record.timestamp).getTime();
+            if (now - timestamp > THREE_MONTHS_MS) {
+                delete checkRecords[code];
+                saveCheckRecords();
+                document.getElementById('checkResult').innerHTML = `<div class="error-box">❌ 此核對碼記錄已超過3個月，已被系統自動清除，無法核對</div>`;
+                setTimeout(() => renderCheck(), 1500);
+                return;
+            }
+            
+            let resultHtml = `<div class="code-box" style="background:#d1fae5;">`;
+            resultHtml += `<div>🎯 核對結果</div>`;
+            
+            if (record.mode === 'single') {
+                let anyPrize = false;
+                for (let i = 0; i < record.data.length; i++) {
+                    const ticket = record.data[i];
+                    const hitNumbers = ticket.filter(n => drawNumbers.includes(n));
+                    const hitCount = hitNumbers.length;
+                    const hasSpecialMatch = ticket.includes(specialNumber);
+                    let prizeText = '';
+                    if (hitCount === 6) { prizeText = '🏆 頭獎'; anyPrize = true; }
+                    else if (hitCount === 5 && hasSpecialMatch) { prizeText = '🎉 二獎'; anyPrize = true; }
+                    else if (hitCount === 5) { prizeText = '🎉 三獎'; anyPrize = true; }
+                    else if (hitCount === 4 && hasSpecialMatch) { prizeText = '🎉 四獎 ($9,600)'; anyPrize = true; }
+                    else if (hitCount === 4) { prizeText = '🎉 五獎 ($640)'; anyPrize = true; }
+                    else if (hitCount === 3 && hasSpecialMatch) { prizeText = '🎉 六獎 ($320)'; anyPrize = true; }
+                    else if (hitCount === 3) { prizeText = '🎉 七獎 ($40)'; anyPrize = true; }
+                    else { prizeText = '未中獎'; }
+                    const hitDisplay = hitNumbers.length ? hitNumbers.join(', ') : '無';
+                    resultHtml += `<div>📌 注 ${i+1}：中獎號碼 ${hitDisplay} → ${prizeText}</div>`;
+                }
+                if (!anyPrize) resultHtml += `<div>❌ 未中獎</div>`;
+            } 
+            else if (record.mode === 'replica') {
+                const recommendedNumbers = record.data.slice();
+                const hitNumbers = [...new Set(recommendedNumbers.filter(n => drawNumbers.includes(n)))];
+                const matchCount = hitNumbers.length;
+                const hasSpecialMatch = recommendedNumbers.includes(specialNumber);
                 let prizeText = '';
-                if (hitCount === 6) { prizeText = '🏆 頭獎'; anyPrize = true; }
-                else if (hitCount === 5 && hasSpecialMatch) { prizeText = '🎉 二獎'; anyPrize = true; }
-                else if (hitCount === 5) { prizeText = '🎉 三獎'; anyPrize = true; }
-                else if (hitCount === 4 && hasSpecialMatch) { prizeText = '🎉 四獎 ($9,600)'; anyPrize = true; }
-                else if (hitCount === 4) { prizeText = '🎉 五獎 ($640)'; anyPrize = true; }
-                else if (hitCount === 3 && hasSpecialMatch) { prizeText = '🎉 六獎 ($320)'; anyPrize = true; }
-                else if (hitCount === 3) { prizeText = '🎉 七獎 ($40)'; anyPrize = true; }
-                else { prizeText = '未中獎'; }
+                if (matchCount >= 6) prizeText = '🏆 恭喜中頭獎！';
+                else if (matchCount === 5 && hasSpecialMatch) prizeText = '🎉 二獎';
+                else if (matchCount === 5) prizeText = '🎉 三獎';
+                else if (matchCount === 4 && hasSpecialMatch) prizeText = '🎉 四獎 ($9,600)';
+                else if (matchCount === 4) prizeText = '🎉 五獎 ($640)';
+                else if (matchCount === 3 && hasSpecialMatch) prizeText = '🎉 六獎 ($320)';
+                else if (matchCount === 3) prizeText = '🎉 七獎 ($40)';
+                else prizeText = '❌ 未中獎';
                 const hitDisplay = hitNumbers.length ? hitNumbers.join(', ') : '無';
-                resultHtml += `<div>📌 注 ${i+1}：中獎號碼 ${hitDisplay} → ${prizeText}</div>`;
+                resultHtml += `<div>中獎預測號碼：${hitDisplay}</div>`;
+                resultHtml += `<div>${prizeText}</div>`;
+            } 
+            else {
+                const danNumbers = record.data.dan;
+                const tuoNumbers = record.data.tuo;
+                const allNumbers = [...danNumbers, ...tuoNumbers];
+                const hitNumbers = [...new Set(allNumbers.filter(n => drawNumbers.includes(n)))];
+                const danHit = danNumbers.filter(n => drawNumbers.includes(n)).length;
+                const tuoHit = tuoNumbers.filter(n => drawNumbers.includes(n)).length;
+                const hasSpecialMatch = allNumbers.includes(specialNumber);
+                let prizeText = '';
+                // 簡化版膽拖獎項判斷（實際官方規則更複雜，此處僅供參考）
+                if (danHit + tuoHit >= 6) prizeText = '🏆 頭獎（需組合匹配）';
+                else if (danHit >= 1 && tuoHit >= 5) prizeText = '🎉 二獎/三獎（視膽中數）';
+                else if (danHit >= 1 && tuoHit >= 4) prizeText = '🎉 四獎/五獎';
+                else if (danHit >= 1 && tuoHit >= 3) prizeText = '🎉 六獎/七獎';
+                else prizeText = '❌ 未中獎';
+                const hitDisplay = hitNumbers.length ? hitNumbers.join(', ') : '無';
+                resultHtml += `<div>中獎號碼：${hitDisplay}</div>`;
+                resultHtml += `<div>特別號：${hasSpecialMatch ? '中' : '不中'}</div>`;
+                resultHtml += `<div>${prizeText}</div>`;
             }
-            if (!anyPrize && !hasSpecialMatch) {
-                resultHtml += `<div>❌ 未中獎</div>`;
-            } else if (!anyPrize && hasSpecialMatch) {
-                resultHtml += `<div>⚠️ 僅中特別號碼（無派彩）</div>`;
-            }
-        } 
-        else if (record.mode === 'replica') {
-            const recommendedNumbers = record.data.slice();
-            const hitNumbers = [...new Set(recommendedNumbers.filter(n => drawNumbers.includes(n)))];
-            const matchCount = hitNumbers.length;
-            let prizeText = '';
-            if (matchCount >= 6) prizeText = '🏆 恭喜中頭獎！';
-            else if (matchCount === 5) prizeText = '🎉 中三獎';
-            else if (matchCount === 4) prizeText = '🎉 中五獎 ($640)';
-            else if (matchCount === 3) prizeText = '🎉 中七獎 ($40)';
-            else prizeText = '❌ 未中獎';
-            const hitDisplay = hitNumbers.length ? hitNumbers.join(', ') : '無';
-            resultHtml += `<div>中獎預測號碼：${hitDisplay}</div>`;
-            resultHtml += `<div>${prizeText}</div>`;
-        } 
-        else {
-            const recommendedNumbers = [...record.data.dan, ...record.data.tuo];
-            const hitNumbers = [...new Set(recommendedNumbers.filter(n => drawNumbers.includes(n)))];
-            const mainHit = hitNumbers.length;
-            const hasSpecialMatch = (record.special === specialNumber);
-            let prizeText = '';
-            if (mainHit === 6) prizeText = '🏆 恭喜中頭獎！';
-            else if (mainHit === 5 && hasSpecialMatch) prizeText = '🎉 中二獎';
-            else if (mainHit === 5) prizeText = '🎉 中三獎';
-            else if (mainHit === 4 && hasSpecialMatch) prizeText = '🎉 中四獎 ($9,600)';
-            else if (mainHit === 4) prizeText = '🎉 中五獎 ($640)';
-            else if (mainHit === 3 && hasSpecialMatch) prizeText = '🎉 中六獎 ($320)';
-            else if (mainHit === 3) prizeText = '🎉 中七獎 ($40)';
-            else prizeText = '❌ 未中獎';
-            const hitDisplay = hitNumbers.length ? hitNumbers.join(', ') : '無';
-            resultHtml += `<div>中獎號碼：${hitDisplay}</div>`;
-            resultHtml += `<div>特別號碼：${hasSpecialMatch ? '✅ 中' : '❌ 不中'}</div>`;
-            resultHtml += `<div>${prizeText}</div>`;
-        }
-        
-        resultHtml += `</div>`;
-        document.getElementById('checkResult').innerHTML = resultHtml;
-        record.checked = true;
-        saveCheckRecords();
-    };
-}
+            
+            resultHtml += `</div>`;
+            document.getElementById('checkResult').innerHTML = resultHtml;
+            record.checked = true;
+            saveCheckRecords();
+        };
+    }
 
     // ========== 切換模式 ==========
     function switchMode(mode) {
