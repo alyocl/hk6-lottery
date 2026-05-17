@@ -16,8 +16,7 @@
         body { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); margin: 0; padding: 20px; min-height: 100vh; }
         .container { max-width: 1200px; margin: 0 auto; background: rgba(255,255,255,0.1); backdrop-filter: blur(2px); border-radius: 2rem; padding: 1.5rem; box-shadow: 0 20px 35px -10px rgba(0,0,0,0.4); }
         .stats-grid { display: flex; flex-direction: column; gap: 1.5rem; }
-        .stat-card { background: white; border-radius: 1.5rem; padding: 1.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.1); transition: transform 0.2s ease, box-shadow 0.2s ease; }
-        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 12px 25px rgba(0,0,0,0.15); }
+        .stat-card { background: white; border-radius: 1.5rem; padding: 1.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
         .card-header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; margin-bottom: 1rem; border-left: 4px solid #f97316; padding-left: 1rem; }
         .card-header h3 { margin: 0; font-size: 1.4rem; color: #0f172a; }
         .badge { background: #f97316; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 40px; }
@@ -40,9 +39,7 @@
         h1 { margin: 0 0 0.25rem 0; font-size: 1.8rem; color: #0f172a; display: flex; align-items: center; gap: 8px; background: white; border-radius: 1.5rem; padding: 1rem 1.5rem; margin-bottom: 1.5rem; }
         .sub { color: #475569; font-size: 0.85rem; border-left: 3px solid #f97316; padding-left: 0.75rem; margin: 0 0 1rem 0; background: white; border-radius: 1rem; padding: 0.8rem 1rem; }
         .trend-card { background: white; border-radius: 1.5rem; padding: 1.5rem; margin-top: 1.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
-        .version-legend { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px; justify-content: center; }
-        .version-marker { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; }
-        .version-marker .line-dash { width: 30px; height: 2px; background: repeating-linear-gradient(90deg, #f97316, #f97316 5px, transparent 5px, transparent 10px); }
+        .version-note { font-size: 0.8rem; text-align: center; margin-top: 10px; color: #f97316; }
         @media (max-width: 640px) {
             .container { padding: 1rem; }
             .stat-card { padding: 1rem; }
@@ -61,18 +58,13 @@
 </div>
 
 <script>
-    // ========== 配置：模型修正時間點（使用期號） ==========
-    const VERSION_MARKERS = [
-        { issue: "26/052", label: "統一評分模型上線" }  // 假設從此期開始使用新版算法
-    ];
-
     const API_KEY = 'AIzaSyCmpR7qGwgfE3y7XIS-O1_cny_iBsDa7No';
     const RESULT_SHEET_ID = '1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw';
     const RESULT_RANGE = 'sheet1!A:H';
     const PREDICT_SHEET_ID = '1ddt9iUMO4FYqJI5_mnoSU5LmgcFW8XKeI043UPY-iKk';
     const PREDICT_RANGE = 'Form Responses 1!A:F';
 
-    let resultMap = new Map(); // key: issueKey, value: { issue, numbers, special }
+    let resultMap = new Map();
     let predictions = [];
 
     function parseRecommendations(recStr, mode) {
@@ -164,7 +156,7 @@
         return { single: { dist: singleHitDist, total: singleTotal }, replica: { dist: replicaHitDist, total: replicaTotal }, dantuo: { danDist: danHitDist, tuoDist: tuoHitDist, total: dantuoTotal } };
     }
 
-    // 按期號聚合命中率（單式）
+    // 按期號聚合命中率
     function computeHitRateByIssue() {
         const issueMap = new Map();
         for (let p of predictions) {
@@ -192,41 +184,6 @@
         const ctx = document.getElementById('dailyTrendChart').getContext('2d');
         if (window.trendChart) window.trendChart.destroy();
         
-        // 找到標記位置
-        const markerPositions = [];
-        for (let marker of VERSION_MARKERS) {
-            const idx = labels.indexOf(marker.issue);
-            if (idx !== -1) markerPositions.push({ index: idx, label: marker.label });
-        }
-        
-        // 自定義插件繪製垂直線
-        const verticalLinePlugin = {
-            id: 'verticalLines',
-            afterDraw(chart) {
-                const { ctx, chartArea: { top, bottom }, scales } = chart;
-                if (!markerPositions.length) return;
-                const xAxis = scales.x;
-                markerPositions.forEach(mp => {
-                    const x = xAxis.getPixelForValue(mp.index);
-                    if (x >= chartArea.left && x <= chartArea.right) {
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.strokeStyle = '#f97316';
-                        ctx.setLineDash([6, 6]);
-                        ctx.lineWidth = 2;
-                        ctx.moveTo(x, top);
-                        ctx.lineTo(x, bottom);
-                        ctx.stroke();
-                        ctx.setLineDash([]);
-                        ctx.fillStyle = '#f97316';
-                        ctx.font = '12px system-ui';
-                        ctx.fillText(mp.label, x + 5, top + 15);
-                        ctx.restore();
-                    }
-                });
-            }
-        };
-        
         window.trendChart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -253,18 +210,8 @@
                     y: { title: { display: true, text: '命中率 (%)', color: '#475569' }, min: 0, max: 100, ticks: { callback: (val) => `${val}%` } },
                     x: { title: { display: true, text: '開獎期號', color: '#475569' } }
                 }
-            },
-            plugins: [verticalLinePlugin]
-        });
-        
-        const legendDiv = document.getElementById('trendLegend');
-        if (legendDiv) {
-            if (markerPositions.length) {
-                legendDiv.innerHTML = markerPositions.map(mp => `<div class="version-marker"><div class="line-dash"></div> <span>${mp.label} (${labels[mp.index]})</span></div>`).join('');
-            } else {
-                legendDiv.innerHTML = '<div class="version-marker">暫無模型修正標記</div>';
             }
-        }
+        });
     }
 
     function renderStats(stats) {
@@ -311,7 +258,7 @@
                 <div class="stat-card">
                     <div class="card-header"><h3>🎯 膽拖</h3><span class="badge">膽+配腳組合</span></div>
                     <div class="stats-summary"><p>總生成次數：<strong>${dantuo.total}</strong></p><p>🎯 膽平均命中數：<span class="metric">${danAvgHit}</span> / 2 &nbsp;|&nbsp; 膽命中≥1的比例：${danRate1Plus}%</p><p>🎲 配腳平均命中數：<span class="metric">${tuoAvgHit}</span> / 6</p></div>
-                    <table class="stat-table"><thead><tr><th>膽命中</th><th>0</th><th>1</th><th>2</th></tr></thead><tbody>${danRow}</tbody></table>
+                    <table class="stat-table"><thead><tr><th>膽命中</th><th>0</th><th>1</th><th>2</th></tr></thead><tbody>${danRow}</tbody></td>
                     <table class="stat-table"><thead><tr><th>配腳命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead><tbody>${tuoRow}</tbody></table>
                     <div class="chart-container"><canvas id="dantuoChart"></canvas></div>
                 </div>
@@ -320,15 +267,12 @@
         
         const trendHtml = `
             <div class="trend-card">
-                <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                    <h3 style="margin:0;">📈 單式每期命中率趨勢（至少中3碼）</h3>
-                    <span class="badge">模型修正標記</span>
-                </div>
+                <h3 style="margin:0 0 0.5rem 0;">📈 單式每期命中率趨勢（至少中3碼）</h3>
                 <div style="margin-top: 1rem;">
                     <canvas id="dailyTrendChart" width="800" height="400" style="max-height: 300px; width: 100%;"></canvas>
                 </div>
-                <div id="trendLegend" class="version-legend"></div>
-                <div class="info-note" style="margin-top: 0.5rem;">垂直虛線代表模型修正日期（如統一評分模型上線）。每點對應各期所有單式預測注數的命中率。</div>
+                <div class="version-note">※ 模型修正參考：統一評分模型於 26/052 期上線</div>
+                <div class="info-note">每點對應各期所有單式預測注數的命中率。</div>
             </div>
         `;
         
