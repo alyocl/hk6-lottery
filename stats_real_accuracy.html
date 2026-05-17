@@ -73,14 +73,14 @@
     const PREDICT_RANGE = 'Form Responses 1!A:F';
 
     let resultMap = new Map(); // key: issueKey, value: { issue, numbers, special }
-    let predictions = [];      // 儲存 { mode, rec, resultNumbers, issueKey, issue }
+    let predictions = [];
 
     function parseRecommendations(recStr, mode) {
         try {
             if (mode === 'single') return JSON.parse(recStr);
             if (mode === 'replica') return JSON.parse(recStr);
             if (mode === 'dantuo') return JSON.parse(recStr);
-        } catch(e) { console.error("解析失敗", recStr, e); return null; }
+        } catch(e) { return null; }
         return null;
     }
 
@@ -124,14 +124,12 @@
             if (!rec) continue;
             predictions.push({
                 mode, rec, resultNumbers: result.numbers,
-                issue: result.issue,      // 記錄期號
-                issueKey
+                issue: result.issue
             });
         }
         console.log(`用戶預測載入完成，共 ${predictions.length} 筆有效匹配`);
     }
 
-    // 原有的統計函數（完整保留）
     function computeStats() {
         let singleHitDist = [0,0,0,0,0,0,0];
         let singleTotal = 0;
@@ -151,8 +149,7 @@
                     singleTotal++;
                 }
             } else if (mode === 'replica') {
-                const recNums = p.rec;
-                const hit = recNums.filter(n => resultNums.includes(n)).length;
+                const hit = p.rec.filter(n => resultNums.includes(n)).length;
                 if (hit>=0 && hit<=6) replicaHitDist[hit]++;
                 replicaTotal++;
             } else if (mode === 'dantuo') {
@@ -167,9 +164,9 @@
         return { single: { dist: singleHitDist, total: singleTotal }, replica: { dist: replicaHitDist, total: replicaTotal }, dantuo: { danDist: danHitDist, tuoDist: tuoHitDist, total: dantuoTotal } };
     }
 
-    // 新：按開獎期號聚合命中率（單式）
+    // 按期號聚合命中率（單式）
     function computeHitRateByIssue() {
-        const issueMap = new Map(); // key: issue (string), value: { totalTickets, hitTickets }
+        const issueMap = new Map();
         for (let p of predictions) {
             if (p.mode !== 'single') continue;
             if (!p.issue) continue;
@@ -181,7 +178,6 @@
                 if (hitCount >= 3) day.hitTickets++;
             }
         }
-        // 按期號排序（例如 26/047, 26/048 ...）
         const sorted = Array.from(issueMap.entries()).sort((a,b) => {
             const numA = parseInt(a[0].split('/')[1]);
             const numB = parseInt(b[0].split('/')[1]);
@@ -192,23 +188,21 @@
         return { labels, rates: rates.map(r => parseFloat(r)) };
     }
 
-    // 繪製趨勢圖（按期號，含垂直標記）
     function renderTrendChart(labels, rates) {
         const ctx = document.getElementById('dailyTrendChart').getContext('2d');
         if (window.trendChart) window.trendChart.destroy();
         
-        // 過濾標記，只保留在 labels 中存在的期號
-        const markers = VERSION_MARKERS.filter(m => labels.includes(m.issue));
-        // 將標記轉換為圖表外掛所需的格式（需要 X 軸索引）
-        // 垂直線繪製需要知道該期號在 labels 中的位置
-        const markerPositions = markers.map(m => ({
-            index: labels.indexOf(m.issue),
-            label: m.label
-        })).filter(m => m.index !== -1);
+        // 找到標記位置
+        const markerPositions = [];
+        for (let marker of VERSION_MARKERS) {
+            const idx = labels.indexOf(marker.issue);
+            if (idx !== -1) markerPositions.push({ index: idx, label: marker.label });
+        }
         
+        // 自定義插件繪製垂直線
         const verticalLinePlugin = {
             id: 'verticalLines',
-            afterDraw(chart, args, options) {
+            afterDraw(chart) {
                 const { ctx, chartArea: { top, bottom }, scales } = chart;
                 if (!markerPositions.length) return;
                 const xAxis = scales.x;
@@ -263,11 +257,10 @@
             plugins: [verticalLinePlugin]
         });
         
-        // 更新圖例
         const legendDiv = document.getElementById('trendLegend');
         if (legendDiv) {
-            if (markers.length) {
-                legendDiv.innerHTML = markers.map(m => `<div class="version-marker"><div class="line-dash"></div> <span>${m.label} (${m.issue})</span></div>`).join('');
+            if (markerPositions.length) {
+                legendDiv.innerHTML = markerPositions.map(mp => `<div class="version-marker"><div class="line-dash"></div> <span>${mp.label} (${labels[mp.index]})</span></div>`).join('');
             } else {
                 legendDiv.innerHTML = '<div class="version-marker">暫無模型修正標記</div>';
             }
@@ -279,41 +272,25 @@
         const replica = stats.replica;
         const dantuo = stats.dantuo;
 
-        function ensure7(arr) {
-            let a = [...arr];
-            while (a.length < 7) a.push(0);
-            return a.slice(0,7);
-        }
-        function ensure3(arr) {
-            let a = [...arr];
-            while (a.length < 3) a.push(0);
-            return a.slice(0,3);
-        }
+        function ensure7(arr) { let a = [...arr]; while(a.length<7) a.push(0); return a.slice(0,7); }
+        function ensure3(arr) { let a = [...arr]; while(a.length<3) a.push(0); return a.slice(0,3); }
         const replicaDist = ensure7(replica.dist);
         const tuoDist = ensure7(dantuo.tuoDist);
         const danDist = ensure3(dantuo.danDist);
 
         const singleRate3Plus = single.total ? (single.dist.slice(3).reduce((a,b)=>a+b,0) / single.total * 100).toFixed(2) : '0';
         const singlePercent = single.dist.map(c => single.total ? (c / single.total * 100).toFixed(1) : '0');
-
         const replicaAvgHit = replica.total ? (replicaDist.reduce((s,c,i)=>s+c*i,0) / replica.total).toFixed(2) : '0';
         const replicaAtLeast3 = replicaDist.slice(3).reduce((a,b)=>a+b,0);
         const replicaRate3Plus = replica.total ? (replicaAtLeast3 / replica.total * 100).toFixed(2) : '0';
-
         const danAvgHit = dantuo.total ? (danDist.reduce((s,c,i)=>s+c*i,0) / dantuo.total).toFixed(2) : '0';
         const tuoAvgHit = dantuo.total ? (tuoDist.reduce((s,c,i)=>s+c*i,0) / dantuo.total).toFixed(2) : '0';
         const danAtLeast1 = danDist.slice(1).reduce((a,b)=>a+b,0);
         const danRate1Plus = dantuo.total ? (danAtLeast1 / dantuo.total * 100).toFixed(2) : '0';
 
-        const replicaRow = `
-            <tr><td><strong>次數</strong></td><td>${replicaDist[0]}</td><td>${replicaDist[1]}</td><td>${replicaDist[2]}</td><td>${replicaDist[3]}</td><td>${replicaDist[4]}</td><td>${replicaDist[5]}</td><td>${replicaDist[6]}</td></tr>
-        `;
-        const tuoRow = `
-            <tr><td><strong>次數</strong></td><td>${tuoDist[0]}</td><td>${tuoDist[1]}</td><td>${tuoDist[2]}</td><td>${tuoDist[3]}</td><td>${tuoDist[4]}</td><td>${tuoDist[5]}</td><td>${tuoDist[6]}</td></tr>
-        `;
-        const danRow = `
-            <tr><td><strong>次數</strong></td><td>${danDist[0]}</td><td>${danDist[1]}</td><td>${danDist[2]}</td></tr>
-        `;
+        const replicaRow = `<tr><td><strong>次數</strong></td>${replicaDist.map(c => `<td>${c}</td>`).join('')}</tr>`;
+        const tuoRow = `<tr><td><strong>次數</strong></td>${tuoDist.map(c => `<td>${c}</td>`).join('')}</tr>`;
+        const danRow = `<tr><td><strong>次數</strong></td>${danDist.map(c => `<td>${c}</td>`).join('')}</tr>`;
 
         let mainHtml = `
             <div class="stats-grid">
@@ -335,7 +312,7 @@
                     <div class="card-header"><h3>🎯 膽拖</h3><span class="badge">膽+配腳組合</span></div>
                     <div class="stats-summary"><p>總生成次數：<strong>${dantuo.total}</strong></p><p>🎯 膽平均命中數：<span class="metric">${danAvgHit}</span> / 2 &nbsp;|&nbsp; 膽命中≥1的比例：${danRate1Plus}%</p><p>🎲 配腳平均命中數：<span class="metric">${tuoAvgHit}</span> / 6</p></div>
                     <table class="stat-table"><thead><tr><th>膽命中</th><th>0</th><th>1</th><th>2</th></tr></thead><tbody>${danRow}</tbody></table>
-                    <table class="stat-table" style="margin-top:12px"><thead><tr><th>配腳命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead><tbody>${tuoRow}</tbody></table>
+                    <table class="stat-table"><thead><tr><th>配腳命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead><tbody>${tuoRow}</tbody></table>
                     <div class="chart-container"><canvas id="dantuoChart"></canvas></div>
                 </div>
             </div>
@@ -361,14 +338,14 @@
         if (replica.total) {
             new Chart(document.getElementById('replicaChart'), {
                 type: 'bar',
-                data: { labels: ['0', '1', '2', '3', '4', '5', '6'], datasets: [{ label: '命中次數分佈', data: replicaDist, backgroundColor: '#f97316', borderRadius: 6 }] },
+                data: { labels: ['0','1','2','3','4','5','6'], datasets: [{ label: '命中次數分佈', data: replicaDist, backgroundColor: '#f97316', borderRadius: 6 }] },
                 options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `${ctx.raw} 次` } } } }
             });
         }
         if (dantuo.total) {
             new Chart(document.getElementById('dantuoChart'), {
                 type: 'bar',
-                data: { labels: ['配腳 0', '1', '2', '3', '4', '5', '6'], datasets: [{ label: '配腳命中分佈', data: tuoDist, backgroundColor: '#3b82f6', borderRadius: 6 }] },
+                data: { labels: ['配腳 0','1','2','3','4','5','6'], datasets: [{ label: '配腳命中分佈', data: tuoDist, backgroundColor: '#3b82f6', borderRadius: 6 }] },
                 options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `${ctx.raw} 次` } } } }
             });
         }
@@ -382,11 +359,10 @@
             renderStats(stats);
             const { labels, rates } = computeHitRateByIssue();
             if (labels.length > 0) renderTrendChart(labels, rates);
-            else console.warn("無足夠數據繪製趨勢圖（按期號聚合為空）");
+            else console.warn("無足夠數據繪製趨勢圖");
         } catch (err) {
             console.error(err);
-            document.getElementById('accuracyContent').innerHTML = `<div class="error-box">❌ 載入失敗：${err.message}<br><span style="font-size:0.8rem;">請確認網路連線或稍後再試</span></div>`;
-            document.getElementById('updateTime').innerText = `載入失敗：${new Date().toLocaleString()}`;
+            document.getElementById('accuracyContent').innerHTML = `<div class="error-box">❌ 載入失敗：${err.message}</div>`;
         }
     }
     init();
