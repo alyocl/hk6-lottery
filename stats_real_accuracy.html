@@ -61,20 +61,19 @@
 </div>
 
 <script>
-    // ========== 配置：模型修正時間點 (YYYY-MM-DD 及說明) ==========
+    // ========== 配置：模型修正時間點（使用期號） ==========
     const VERSION_MARKERS = [
-        { date: "2026-05-17", label: "統一評分模型上線" }
-        // 可繼續增加，例如 { date: "2026-05-24", label: "調整冷熱權重" }
+        { issue: "26/052", label: "統一評分模型上線" }  // 假設從此期開始使用新版算法
     ];
 
     const API_KEY = 'AIzaSyCmpR7qGwgfE3y7XIS-O1_cny_iBsDa7No';
     const RESULT_SHEET_ID = '1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw';
     const RESULT_RANGE = 'sheet1!A:H';
     const PREDICT_SHEET_ID = '1ddt9iUMO4FYqJI5_mnoSU5LmgcFW8XKeI043UPY-iKk';
-    const PREDICT_RANGE = 'Form Responses 1!A:F';  // A列為時間戳，B-F為其他欄位
+    const PREDICT_RANGE = 'Form Responses 1!A:F';
 
-    let resultMap = new Map();
-    let predictions = [];   // 儲存 { mode, rec, resultNumbers, timestamp }
+    let resultMap = new Map(); // key: issueKey, value: { issue, numbers, special }
+    let predictions = [];      // 儲存 { mode, rec, resultNumbers, issueKey, issue }
 
     function parseRecommendations(recStr, mode) {
         try {
@@ -115,11 +114,6 @@
         for (let i = 1; i < data.values.length; i++) {
             const row = data.values[i];
             if (row.length < 6) continue;
-            let timestamp = null;
-            if (row[0]) {
-                const ts = new Date(row[0]);
-                if (!isNaN(ts.getTime())) timestamp = ts;
-            }
             const mode = row[2];
             const recStr = row[4];
             const issueKey = row[5];
@@ -130,13 +124,14 @@
             if (!rec) continue;
             predictions.push({
                 mode, rec, resultNumbers: result.numbers,
-                timestamp: timestamp
+                issue: result.issue,      // 記錄期號
+                issueKey
             });
         }
         console.log(`用戶預測載入完成，共 ${predictions.length} 筆有效匹配`);
     }
 
-    // 原有的統計函數
+    // 原有的統計函數（完整保留）
     function computeStats() {
         let singleHitDist = [0,0,0,0,0,0,0];
         let singleTotal = 0;
@@ -172,42 +167,53 @@
         return { single: { dist: singleHitDist, total: singleTotal }, replica: { dist: replicaHitDist, total: replicaTotal }, dantuo: { danDist: danHitDist, tuoDist: tuoHitDist, total: dantuoTotal } };
     }
 
-    // 新增：計算每日命中率（單式）
-    function computeDailyHitRate() {
-        const dailyMap = new Map(); // key: YYYY-MM-DD, value: { totalTickets, hitTickets }
+    // 新：按開獎期號聚合命中率（單式）
+    function computeHitRateByIssue() {
+        const issueMap = new Map(); // key: issue (string), value: { totalTickets, hitTickets }
         for (let p of predictions) {
             if (p.mode !== 'single') continue;
-            if (!p.timestamp) continue;
-            const dateStr = p.timestamp.toISOString().slice(0,10);
-            if (!dailyMap.has(dateStr)) dailyMap.set(dateStr, { totalTickets: 0, hitTickets: 0 });
-            const day = dailyMap.get(dateStr);
+            if (!p.issue) continue;
+            if (!issueMap.has(p.issue)) issueMap.set(p.issue, { totalTickets: 0, hitTickets: 0 });
+            const day = issueMap.get(p.issue);
             for (let ticket of p.rec) {
                 const hitCount = ticket.filter(n => p.resultNumbers.includes(n)).length;
                 day.totalTickets++;
                 if (hitCount >= 3) day.hitTickets++;
             }
         }
-        const sorted = Array.from(dailyMap.entries()).sort((a,b) => a[0].localeCompare(b[0]));
+        // 按期號排序（例如 26/047, 26/048 ...）
+        const sorted = Array.from(issueMap.entries()).sort((a,b) => {
+            const numA = parseInt(a[0].split('/')[1]);
+            const numB = parseInt(b[0].split('/')[1]);
+            return numA - numB;
+        });
         const labels = sorted.map(d => d[0]);
         const rates = sorted.map(d => (d[1].hitTickets / d[1].totalTickets * 100).toFixed(2));
         return { labels, rates: rates.map(r => parseFloat(r)) };
     }
 
-    // 繪製趨勢圖（含垂直標記）
+    // 繪製趨勢圖（按期號，含垂直標記）
     function renderTrendChart(labels, rates) {
         const ctx = document.getElementById('dailyTrendChart').getContext('2d');
         if (window.trendChart) window.trendChart.destroy();
         
-        const markers = VERSION_MARKERS.filter(m => labels.includes(m.date));
+        // 過濾標記，只保留在 labels 中存在的期號
+        const markers = VERSION_MARKERS.filter(m => labels.includes(m.issue));
+        // 將標記轉換為圖表外掛所需的格式（需要 X 軸索引）
+        // 垂直線繪製需要知道該期號在 labels 中的位置
+        const markerPositions = markers.map(m => ({
+            index: labels.indexOf(m.issue),
+            label: m.label
+        })).filter(m => m.index !== -1);
         
         const verticalLinePlugin = {
             id: 'verticalLines',
             afterDraw(chart, args, options) {
                 const { ctx, chartArea: { top, bottom }, scales } = chart;
-                if (!options.markers || options.markers.length === 0) return;
+                if (!markerPositions.length) return;
                 const xAxis = scales.x;
-                options.markers.forEach(marker => {
-                    const x = xAxis.getPixelForValue(marker.date);
+                markerPositions.forEach(mp => {
+                    const x = xAxis.getPixelForValue(mp.index);
                     if (x >= chartArea.left && x <= chartArea.right) {
                         ctx.save();
                         ctx.beginPath();
@@ -220,7 +226,7 @@
                         ctx.setLineDash([]);
                         ctx.fillStyle = '#f97316';
                         ctx.font = '12px system-ui';
-                        ctx.fillText(marker.label, x + 5, top + 15);
+                        ctx.fillText(mp.label, x + 5, top + 15);
                         ctx.restore();
                     }
                 });
@@ -251,17 +257,17 @@
                 },
                 scales: {
                     y: { title: { display: true, text: '命中率 (%)', color: '#475569' }, min: 0, max: 100, ticks: { callback: (val) => `${val}%` } },
-                    x: { title: { display: true, text: '日期', color: '#475569' } }
-                },
-                plugins: { verticalLines: { markers } }
+                    x: { title: { display: true, text: '開獎期號', color: '#475569' } }
+                }
             },
             plugins: [verticalLinePlugin]
         });
         
+        // 更新圖例
         const legendDiv = document.getElementById('trendLegend');
         if (legendDiv) {
             if (markers.length) {
-                legendDiv.innerHTML = markers.map(m => `<div class="version-marker"><div class="line-dash"></div> <span>${m.label} (${m.date})</span></div>`).join('');
+                legendDiv.innerHTML = markers.map(m => `<div class="version-marker"><div class="line-dash"></div> <span>${m.label} (${m.issue})</span></div>`).join('');
             } else {
                 legendDiv.innerHTML = '<div class="version-marker">暫無模型修正標記</div>';
             }
@@ -309,7 +315,6 @@
             <tr><td><strong>次數</strong></td><td>${danDist[0]}</td><td>${danDist[1]}</td><td>${danDist[2]}</td></tr>
         `;
 
-        // 構建主要內容：單式 → 複式 → 膽拖
         let mainHtml = `
             <div class="stats-grid">
                 <div class="stat-card">
@@ -336,18 +341,17 @@
             </div>
         `;
         
-        // 新增趨勢圖卡片（放在膽拖下方）
         const trendHtml = `
             <div class="trend-card">
                 <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                    <h3 style="margin:0;">📈 單式每日命中率趨勢（至少中3碼）</h3>
+                    <h3 style="margin:0;">📈 單式每期命中率趨勢（至少中3碼）</h3>
                     <span class="badge">模型修正標記</span>
                 </div>
                 <div style="margin-top: 1rem;">
                     <canvas id="dailyTrendChart" width="800" height="400" style="max-height: 300px; width: 100%;"></canvas>
                 </div>
                 <div id="trendLegend" class="version-legend"></div>
-                <div class="info-note" style="margin-top: 0.5rem;">垂直虛線代表模型修正日期（如統一評分模型上線）。每點對應當日所有單式預測注數的命中率。</div>
+                <div class="info-note" style="margin-top: 0.5rem;">垂直虛線代表模型修正日期（如統一評分模型上線）。每點對應各期所有單式預測注數的命中率。</div>
             </div>
         `;
         
@@ -376,9 +380,9 @@
             await loadPredictions();
             const stats = computeStats();
             renderStats(stats);
-            const { labels, rates } = computeDailyHitRate();
+            const { labels, rates } = computeHitRateByIssue();
             if (labels.length > 0) renderTrendChart(labels, rates);
-            else console.warn("無足夠數據繪製趨勢圖");
+            else console.warn("無足夠數據繪製趨勢圖（按期號聚合為空）");
         } catch (err) {
             console.error(err);
             document.getElementById('accuracyContent').innerHTML = `<div class="error-box">❌ 載入失敗：${err.message}<br><span style="font-size:0.8rem;">請確認網路連線或稍後再試</span></div>`;
