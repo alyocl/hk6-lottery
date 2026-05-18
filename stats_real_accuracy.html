@@ -3,20 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <meta name="robots" content="index, follow">
-    <meta name="author" content="alycol">
-    <meta name="language" content="zh-Hant">
-    <meta name="revisit-after" content="1 days">
     <title>六合彩 AI 真實命中率統計 | 單式・複式・膽拖命中率分析</title>
-    <meta name="description" content="查看六合彩 AI 預測系統的真實命中率數據，包括單式注數命中分佈、複式推薦號碼命中率、膽拖組合表現。基於實際開獎結果統計。">
-    <meta name="keywords" content="六合彩命中率,AI預測準確度,六合彩統計,複式命中,膽拖命中">
-    <link rel="canonical" href="https://hk6.netlify.app/stats_real_accuracy">
     <style>
         * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans TC', sans-serif; }
         body { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); margin: 0; padding: 20px; min-height: 100vh; }
         .container { max-width: 1200px; margin: 0 auto; background: rgba(255,255,255,0.1); backdrop-filter: blur(2px); border-radius: 2rem; padding: 1.5rem; box-shadow: 0 20px 35px -10px rgba(0,0,0,0.4); }
         .stats-grid { display: flex; flex-direction: column; gap: 1.5rem; }
-        .stat-card { background: white; border-radius: 1.5rem; padding: 1.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        .stat-card { background: white; border-radius: 1.5rem; padding: 1.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.1); transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 12px 25px rgba(0,0,0,0.15); }
         .card-header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; margin-bottom: 1rem; border-left: 4px solid #f97316; padding-left: 1rem; }
         .card-header h3 { margin: 0; font-size: 1.4rem; color: #0f172a; }
         .badge { background: #f97316; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 40px; }
@@ -38,8 +32,7 @@
         .error-box { background: #fee2e2; color: #dc2626; }
         h1 { margin: 0 0 0.25rem 0; font-size: 1.8rem; color: #0f172a; display: flex; align-items: center; gap: 8px; background: white; border-radius: 1.5rem; padding: 1rem 1.5rem; margin-bottom: 1.5rem; }
         .sub { color: #475569; font-size: 0.85rem; border-left: 3px solid #f97316; padding-left: 0.75rem; margin: 0 0 1rem 0; background: white; border-radius: 1rem; padding: 0.8rem 1rem; }
-        .trend-card { background: white; border-radius: 1.5rem; padding: 1.5rem; margin-top: 1.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
-        .version-note { font-size: 0.8rem; text-align: center; margin-top: 10px; color: #f97316; }
+        .trend-card { background: white; border-radius: 1.5rem; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
         @media (max-width: 640px) {
             .container { padding: 1rem; }
             .stat-card { padding: 1rem; }
@@ -53,6 +46,19 @@
 <div class="container">
     <h1>📊 真實用戶命中率分析 <span class="badge" style="background:#10b981;"></span></h1>
     <div class="sub">基於 Google Forms 收集的用戶預測數據｜匹配真實開獎結果｜<span id="updateTime"></span></div>
+
+    <!-- 趨勢圖卡片（雙指標） -->
+    <div class="trend-card">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <h3 style="margin:0;">📈 單式預測趨勢（平均命中個數 vs 至少中3碼比例）</h3>
+            <span class="badge">雙軸圖表</span>
+        </div>
+        <div style="margin-top: 1rem;">
+            <canvas id="trendChart" width="800" height="300" style="max-height: 350px; width: 100%;"></canvas>
+        </div>
+        <div class="info-note" style="margin-top: 0.5rem;">藍線：平均每注命中個數（左軸）；橙線：至少中3碼的注數比例（右軸）。</div>
+    </div>
+
     <div id="accuracyContent"><div class="loading">⏳ 載入數據並進行命中率比對中...</div></div>
     <div class="footer-links"><a href="/">← 返回預測系統</a> | <a href="/stats">📊 數據統計</a> | <a href="/stats_accuracy.html">📈 回測命中率</a></div>
 </div>
@@ -65,7 +71,7 @@
     const PREDICT_RANGE = 'Form Responses 1!A:F';
 
     let resultMap = new Map();
-    let predictions = [];
+    let predictions = [];   // { mode, rec, resultNumbers, issue, timestamp }
 
     function parseRecommendations(recStr, mode) {
         try {
@@ -106,6 +112,11 @@
         for (let i = 1; i < data.values.length; i++) {
             const row = data.values[i];
             if (row.length < 6) continue;
+            let timestamp = null;
+            if (row[0]) {
+                const ts = new Date(row[0]);
+                if (!isNaN(ts.getTime())) timestamp = ts;
+            }
             const mode = row[2];
             const recStr = row[4];
             const issueKey = row[5];
@@ -116,12 +127,43 @@
             if (!rec) continue;
             predictions.push({
                 mode, rec, resultNumbers: result.numbers,
-                issue: result.issue
+                issue: result.issue,
+                timestamp: timestamp
             });
         }
         console.log(`用戶預測載入完成，共 ${predictions.length} 筆有效匹配`);
     }
 
+    // 計算每日兩個指標
+    function computeDailyMetrics() {
+        const dailyMap = new Map(); // key: 日期或期號, value: { totalHits, totalTickets, hit3Plus }
+        for (let p of predictions) {
+            if (p.mode !== 'single') continue;
+            let dateKey = null;
+            if (p.timestamp) {
+                dateKey = p.timestamp.toISOString().slice(0,10);
+            } else if (p.issue) {
+                dateKey = p.issue;
+            } else {
+                continue;
+            }
+            if (!dailyMap.has(dateKey)) dailyMap.set(dateKey, { totalHits: 0, totalTickets: 0, hit3Plus: 0 });
+            const day = dailyMap.get(dateKey);
+            for (let ticket of p.rec) {
+                const hitCount = ticket.filter(n => p.resultNumbers.includes(n)).length;
+                day.totalHits += hitCount;
+                day.totalTickets++;
+                if (hitCount >= 3) day.hit3Plus++;
+            }
+        }
+        const sorted = Array.from(dailyMap.entries()).sort((a,b) => a[0].localeCompare(b[0]));
+        const labels = sorted.map(d => d[0]);
+        const avgHits = sorted.map(d => (d[1].totalHits / d[1].totalTickets).toFixed(2));
+        const hit3PlusRate = sorted.map(d => (d[1].hit3Plus / d[1].totalTickets * 100).toFixed(2));
+        return { labels, avgHits: avgHits.map(v => parseFloat(v)), hit3PlusRate: hit3PlusRate.map(v => parseFloat(v)) };
+    }
+
+    // 原有統計函數（完整保留）
     function computeStats() {
         let singleHitDist = [0,0,0,0,0,0,0];
         let singleTotal = 0;
@@ -156,64 +198,6 @@
         return { single: { dist: singleHitDist, total: singleTotal }, replica: { dist: replicaHitDist, total: replicaTotal }, dantuo: { danDist: danHitDist, tuoDist: tuoHitDist, total: dantuoTotal } };
     }
 
-    // 按期號聚合命中率
-    function computeHitRateByIssue() {
-        const issueMap = new Map();
-        for (let p of predictions) {
-            if (p.mode !== 'single') continue;
-            if (!p.issue) continue;
-            if (!issueMap.has(p.issue)) issueMap.set(p.issue, { totalTickets: 0, hitTickets: 0 });
-            const day = issueMap.get(p.issue);
-            for (let ticket of p.rec) {
-                const hitCount = ticket.filter(n => p.resultNumbers.includes(n)).length;
-                day.totalTickets++;
-                if (hitCount >= 3) day.hitTickets++;
-            }
-        }
-        const sorted = Array.from(issueMap.entries()).sort((a,b) => {
-            const numA = parseInt(a[0].split('/')[1]);
-            const numB = parseInt(b[0].split('/')[1]);
-            return numA - numB;
-        });
-        const labels = sorted.map(d => d[0]);
-        const rates = sorted.map(d => (d[1].hitTickets / d[1].totalTickets * 100).toFixed(2));
-        return { labels, rates: rates.map(r => parseFloat(r)) };
-    }
-
-    function renderTrendChart(labels, rates) {
-        const ctx = document.getElementById('dailyTrendChart').getContext('2d');
-        if (window.trendChart) window.trendChart.destroy();
-        
-        window.trendChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: '至少中3碼比例 (%)',
-                    data: rates,
-                    borderColor: '#f97316',
-                    backgroundColor: 'rgba(249,115,22,0.1)',
-                    tension: 0.1,
-                    fill: true,
-                    pointRadius: 4,
-                    pointHoverRadius: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    tooltip: { callbacks: { label: (ctx) => `${ctx.raw}%` } },
-                    legend: { position: 'top' }
-                },
-                scales: {
-                    y: { title: { display: true, text: '命中率 (%)', color: '#475569' }, min: 0, max: 100, ticks: { callback: (val) => `${val}%` } },
-                    x: { title: { display: true, text: '開獎期號', color: '#475569' } }
-                }
-            }
-        });
-    }
-
     function renderStats(stats) {
         const single = stats.single;
         const replica = stats.replica;
@@ -239,7 +223,7 @@
         const tuoRow = `<tr><td><strong>次數</strong></td>${tuoDist.map(c => `<td>${c}</td>`).join('')}</tr>`;
         const danRow = `<tr><td><strong>次數</strong></td>${danDist.map(c => `<td>${c}</td>`).join('')}</tr>`;
 
-        let mainHtml = `
+        const html = `
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="card-header"><h3>📌 單式</h3><span class="badge">每注獨立統計</span></div>
@@ -258,41 +242,98 @@
                 <div class="stat-card">
                     <div class="card-header"><h3>🎯 膽拖</h3><span class="badge">膽+配腳組合</span></div>
                     <div class="stats-summary"><p>總生成次數：<strong>${dantuo.total}</strong></p><p>🎯 膽平均命中數：<span class="metric">${danAvgHit}</span> / 2 &nbsp;|&nbsp; 膽命中≥1的比例：${danRate1Plus}%</p><p>🎲 配腳平均命中數：<span class="metric">${tuoAvgHit}</span> / 6</p></div>
-                    <table class="stat-table"><thead><tr><th>膽命中</th><th>0</th><th>1</th><th>2</th></tr></thead><tbody>${danRow}</tbody></td>
-                    <table class="stat-table"><thead><tr><th>配腳命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead><tbody>${tuoRow}</tbody></table>
+                    <table class="stat-table"><thead><tr><th>膽命中</th><th>0</th><th>1</th><th>2</th></tr></thead><tbody>${danRow}</tbody></table>
+                    <table class="stat-table" style="margin-top:12px"><thead><tr><th>配腳命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead><tbody>${tuoRow}</tbody></table>
                     <div class="chart-container"><canvas id="dantuoChart"></canvas></div>
                 </div>
             </div>
+            <div class="info-note" style="margin-top:1.5rem;">✅ 統計基於 ${predictions.length} 筆用戶預測記錄（匹配到開獎結果）。更新時間：${new Date().toLocaleString()}</div>
         `;
-        
-        const trendHtml = `
-            <div class="trend-card">
-                <h3 style="margin:0 0 0.5rem 0;">📈 單式每期命中率趨勢（至少中3碼）</h3>
-                <div style="margin-top: 1rem;">
-                    <canvas id="dailyTrendChart" width="800" height="400" style="max-height: 300px; width: 100%;"></canvas>
-                </div>
-                <div class="version-note">※ 模型修正參考：統一評分模型於 26/052 期上線</div>
-                <div class="info-note">每點對應各期所有單式預測注數的命中率。</div>
-            </div>
-        `;
-        
-        document.getElementById('accuracyContent').innerHTML = mainHtml + trendHtml;
+        document.getElementById('accuracyContent').innerHTML = html;
         document.getElementById('updateTime').innerText = `最後更新：${new Date().toLocaleString()}`;
 
         if (replica.total) {
             new Chart(document.getElementById('replicaChart'), {
-                type: 'bar',
-                data: { labels: ['0','1','2','3','4','5','6'], datasets: [{ label: '命中次數分佈', data: replicaDist, backgroundColor: '#f97316', borderRadius: 6 }] },
+                type: 'bar', data: { labels: ['0','1','2','3','4','5','6'], datasets: [{ label: '命中次數分佈', data: replicaDist, backgroundColor: '#f97316', borderRadius: 6 }] },
                 options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `${ctx.raw} 次` } } } }
             });
         }
         if (dantuo.total) {
             new Chart(document.getElementById('dantuoChart'), {
-                type: 'bar',
-                data: { labels: ['配腳 0','1','2','3','4','5','6'], datasets: [{ label: '配腳命中分佈', data: tuoDist, backgroundColor: '#3b82f6', borderRadius: 6 }] },
+                type: 'bar', data: { labels: ['配腳 0','1','2','3','4','5','6'], datasets: [{ label: '配腳命中分佈', data: tuoDist, backgroundColor: '#3b82f6', borderRadius: 6 }] },
                 options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (ctx) => `${ctx.raw} 次` } } } }
             });
         }
+    }
+
+    function renderTrendChart(labels, avgHits, hit3PlusRate) {
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        if (window.trendChartObj) window.trendChartObj.destroy();
+        window.trendChartObj = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: '平均命中個數 (每注)',
+                        data: avgHits,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59,130,246,0.1)',
+                        tension: 0.2,
+                        fill: true,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: '至少中3碼比例 (%)',
+                        data: hit3PlusRate,
+                        borderColor: '#f97316',
+                        backgroundColor: 'rgba(249,115,22,0.05)',
+                        tension: 0.2,
+                        fill: false,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                let value = context.raw;
+                                if (context.dataset.label.includes('平均命中')) return `${label}: ${value} 個`;
+                                return `${label}: ${value}%`;
+                            }
+                        }
+                    },
+                    legend: { position: 'top' }
+                },
+                scales: {
+                    y: {
+                        title: { display: true, text: '平均命中個數', color: '#3b82f6' },
+                        min: 0,
+                        max: 6,
+                        ticks: { stepSize: 1, callback: (val) => `${val} 個` }
+                    },
+                    y1: {
+                        position: 'right',
+                        title: { display: true, text: '至少中3碼比例 (%)', color: '#f97316' },
+                        min: 0,
+                        max: 100,
+                        ticks: { callback: (val) => `${val}%` },
+                        grid: { drawOnChartArea: false }
+                    },
+                    x: { title: { display: true, text: '日期 / 期號', color: '#475569' } }
+                }
+            }
+        });
     }
 
     async function init() {
@@ -301,8 +342,8 @@
             await loadPredictions();
             const stats = computeStats();
             renderStats(stats);
-            const { labels, rates } = computeHitRateByIssue();
-            if (labels.length > 0) renderTrendChart(labels, rates);
+            const { labels, avgHits, hit3PlusRate } = computeDailyMetrics();
+            if (labels.length > 0) renderTrendChart(labels, avgHits, hit3PlusRate);
             else console.warn("無足夠數據繪製趨勢圖");
         } catch (err) {
             console.error(err);
