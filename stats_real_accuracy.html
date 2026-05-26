@@ -74,10 +74,10 @@
     const RESULT_SHEET_ID = '1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw';
     const RESULT_RANGE = 'sheet1!A:H';
     const PREDICT_SHEET_ID = '1ddt9iUMO4FYqJI5_mnoSU5LmgcFW8XKeI043UPY-iKk';
-    const PREDICT_RANGE = 'Form Responses 1!A:F';  // A:時間戳, B:核對碼, C:模式, D:參數, E:預測數據, F:期號Key
+    const PREDICT_RANGE = 'Form Responses 1!A:F';
 
     let resultMap = new Map();
-    let predictions = [];   // 儲存 { mode, rec, resultNumbers, issue, timestamp, checkCode }
+    let predictions = [];
 
     function parseRecommendations(recStr, mode) {
         try {
@@ -118,10 +118,13 @@
         for (let i = 1; i < data.values.length; i++) {
             const row = data.values[i];
             if (row.length < 6) continue;
-            // 時間戳 (A欄)
+            const rawTimestamp = row[0] ? row[0].trim() : null;
             let timestamp = null;
-            if (row[0]) { const ts = new Date(row[0]); if (!isNaN(ts.getTime())) timestamp = ts; }
-            const checkCode = row[1] ? row[1].trim() : null;   // 核對碼 (B欄)
+            if (rawTimestamp) {
+                const ts = new Date(rawTimestamp);
+                if (!isNaN(ts.getTime())) timestamp = ts;
+            }
+            const checkCode = row[1] ? row[1].trim() : null;
             const mode = row[2];
             const recStr = row[4];
             const issueKey = row[5];
@@ -134,6 +137,7 @@
                 mode, rec, resultNumbers: result.numbers,
                 issue: result.issue,
                 timestamp: timestamp,
+                rawTimestamp: rawTimestamp,
                 checkCode: checkCode
             });
         }
@@ -144,7 +148,7 @@
         const dailyMap = new Map();
         for (let p of predictions) {
             if (p.mode !== 'single') continue;
-            let dateKey = p.timestamp ? p.timestamp.toISOString().slice(0,10) : p.issue;
+            let dateKey = p.timestamp ? p.timestamp.toISOString().slice(0,10) : (p.issue ? p.issue : '未知');
             if (!dailyMap.has(dateKey)) dailyMap.set(dateKey, { totalHits: 0, totalTickets: 0, hit3Plus: 0 });
             const day = dailyMap.get(dateKey);
             for (let ticket of p.rec) {
@@ -174,7 +178,7 @@
                         hitCount: hitCount,
                         resultNumbers: p.resultNumbers,
                         checkCode: p.checkCode,
-                        timestamp: p.timestamp
+                        timeDisplay: p.timestamp ? p.timestamp.toLocaleString() : (p.rawTimestamp || '未知')
                     });
                 }
             }
@@ -193,14 +197,13 @@
         }
         let html = '<table class="winner-table"><thead><tr><th>期號</th><th>預測號碼</th><th>命中個數</th><th>開獎號碼</th><th>核對碼</th><th>生成時間</th></tr></thead><tbody>';
         for (let w of winners) {
-            const timeStr = w.timestamp ? w.timestamp.toLocaleString() : '未知';
             html += `<tr>
                         <td>${w.issue}</td>
                         <td>${w.ticket.join(', ')}</td>
                         <td>${w.hitCount}</td>
                         <td>${w.resultNumbers.join(', ')}</td>
                         <td>${w.checkCode || '無'}</td>
-                        <td>${timeStr}</td>
+                        <td>${w.timeDisplay}</td>
                       </tr>`;
         }
         html += '</tbody></table>';
@@ -286,8 +289,8 @@
                 <div class="stat-card">
                     <div class="card-header"><h3>🎯 膽拖</h3><span class="badge">膽+配腳組合</span></div>
                     <div class="stats-summary"><p>總生成次數：<strong>${dantuo.total}</strong></p><p>🎯 膽平均命中數：<span class="metric">${danAvgHit}</span> / 2 &nbsp;|&nbsp; 膽命中≥1的比例：${danRate1Plus}%</p><p>🎲 配腳平均命中數：<span class="metric">${tuoAvgHit}</span> / 6</p></div>
-                    <table class="stat-table"><thead><tr><th>膽命中</th><th>0</th><th>1</th><th>2</th></table></thead><tbody>${danRow}</tbody></table>
-                    <table class="stat-table" style="margin-top:12px"><thead><tr><th>配腳命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead><tbody>${tuoRow}</tbody></tr>
+                    <table class="stat-table"><thead><tr><th>膽命中</th><th>0</th><th>1</th><th>2</th></tr></thead><tbody>${danRow}</tbody></table>
+                    <table class="stat-table" style="margin-top:12px"><thead><tr><th>配腳命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead><tbody>${tuoRow}</tbody></table>
                     <div class="chart-container"><canvas id="dantuoChart"></canvas></div>
                 </div>
             </div>
