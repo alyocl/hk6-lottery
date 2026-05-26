@@ -44,7 +44,6 @@
     <h1>📊 真實用戶命中率分析 <span class="badge" style="background:#10b981;"></span></h1>
     <div class="sub">基於 Google Forms 收集的用戶預測數據｜匹配真實開獎結果｜<span id="updateTime"></span></div>
 
-    <!-- 趨勢圖卡片 -->
     <div class="trend-card">
         <div style="display: flex; justify-content: space-between; align-items: baseline;">
             <h3 style="margin:0;">📈 單式預測趨勢（平均命中個數 vs 至少中3碼比例）</h3>
@@ -58,14 +57,13 @@
 
     <div id="accuracyContent"><div class="loading">⏳ 載入數據並進行命中率比對中...</div></div>
 
-    <!-- 新增中獎明細卡片 -->
     <div id="winnerDetailCard" class="winner-card" style="display:none;">
         <div class="card-header">
             <h3>🏆 中獎明細（單式注命中 ≥3 個號碼）</h3>
             <span class="badge">詳細記錄</span>
         </div>
         <div id="winnerDetailTable"></div>
-        <div class="info-note">僅顯示命中3個或以上號碼的單式預測。核對碼可於「核對中獎」頁面查詢詳細開獎。</div>
+        <div class="info-note">僅顯示命中3個或以上號碼的單式預測。核對碼可於「核對中獎」頁面查詢。</div>
     </div>
 
     <div class="footer-links"><a href="/">← 返回預測系統</a> | <a href="/stats">📊 數據統計</a> | <a href="/stats_accuracy.html">📈 回測命中率</a></div>
@@ -76,11 +74,10 @@
     const RESULT_SHEET_ID = '1N0DoSvoTjfQ_aFWkG3pOn_28MaquDSwnfiyTJqVA2Fw';
     const RESULT_RANGE = 'sheet1!A:H';
     const PREDICT_SHEET_ID = '1ddt9iUMO4FYqJI5_mnoSU5LmgcFW8XKeI043UPY-iKk';
-    const PREDICT_RANGE = 'Form Responses 1!A:F';
+    const PREDICT_RANGE = 'Form Responses 1!A:F';  // A:時間戳, B:核對碼, C:模式, D:參數, E:預測數據, F:期號Key
 
     let resultMap = new Map();
-    let predictions = [];   // 儲存 { mode, rec, resultNumbers, issue, timestamp, code? 但 code 不在這裡，需從 Google Forms 取得？暫時無 code，只能顯示預測號碼和期號 }
-    let fullPredictionsFromSheet = []; // 儲存含核對碼的原始記錄，但需要另外讀取，先簡化：只顯示期號和預測號碼
+    let predictions = [];   // 儲存 { mode, rec, resultNumbers, issue, timestamp, checkCode }
 
     function parseRecommendations(recStr, mode) {
         try {
@@ -121,8 +118,10 @@
         for (let i = 1; i < data.values.length; i++) {
             const row = data.values[i];
             if (row.length < 6) continue;
+            // 時間戳 (A欄)
             let timestamp = null;
             if (row[0]) { const ts = new Date(row[0]); if (!isNaN(ts.getTime())) timestamp = ts; }
+            const checkCode = row[1] ? row[1].trim() : null;   // 核對碼 (B欄)
             const mode = row[2];
             const recStr = row[4];
             const issueKey = row[5];
@@ -134,13 +133,13 @@
             predictions.push({
                 mode, rec, resultNumbers: result.numbers,
                 issue: result.issue,
-                timestamp: timestamp
+                timestamp: timestamp,
+                checkCode: checkCode
             });
         }
         console.log(`用戶預測載入完成，共 ${predictions.length} 筆有效匹配`);
     }
 
-    // 計算每日兩個指標
     function computeDailyMetrics() {
         const dailyMap = new Map();
         for (let p of predictions) {
@@ -162,7 +161,6 @@
         return { labels, avgHits: avgHits.map(v => parseFloat(v)), hit3PlusRate: hit3PlusRate.map(v => parseFloat(v)) };
     }
 
-    // 找出所有命中 >=3 的單式注（用於中獎明細）
     function findWinningTickets() {
         const winners = [];
         for (let p of predictions) {
@@ -174,7 +172,9 @@
                         issue: p.issue,
                         ticket: ticket,
                         hitCount: hitCount,
-                        resultNumbers: p.resultNumbers
+                        resultNumbers: p.resultNumbers,
+                        checkCode: p.checkCode,
+                        timestamp: p.timestamp
                     });
                 }
             }
@@ -182,7 +182,6 @@
         return winners;
     }
 
-    // 渲染中獎明細表格
     function renderWinnerDetails(winners) {
         const container = document.getElementById('winnerDetailTable');
         const card = document.getElementById('winnerDetailCard');
@@ -192,21 +191,23 @@
             card.style.display = 'block';
             return;
         }
-        let html = '<table class="winner-table"><thead><tr><th>期號</th><th>預測號碼</th><th>命中個數</th><th>開獎號碼</th></tr></thead><tbody>';
+        let html = '<table class="winner-table"><thead><tr><th>期號</th><th>預測號碼</th><th>命中個數</th><th>開獎號碼</th><th>核對碼</th><th>生成時間</th></tr></thead><tbody>';
         for (let w of winners) {
+            const timeStr = w.timestamp ? w.timestamp.toLocaleString() : '未知';
             html += `<tr>
                         <td>${w.issue}</td>
                         <td>${w.ticket.join(', ')}</td>
                         <td>${w.hitCount}</td>
                         <td>${w.resultNumbers.join(', ')}</td>
-                     </tr>`;
+                        <td>${w.checkCode || '無'}</td>
+                        <td>${timeStr}</td>
+                      </tr>`;
         }
         html += '</tbody></table>';
         container.innerHTML = html;
         card.style.display = 'block';
     }
 
-    // 原有統計函數（簡化，保留核心）
     function computeStats() {
         let singleHitDist = [0,0,0,0,0,0,0];
         let singleTotal = 0;
@@ -285,8 +286,8 @@
                 <div class="stat-card">
                     <div class="card-header"><h3>🎯 膽拖</h3><span class="badge">膽+配腳組合</span></div>
                     <div class="stats-summary"><p>總生成次數：<strong>${dantuo.total}</strong></p><p>🎯 膽平均命中數：<span class="metric">${danAvgHit}</span> / 2 &nbsp;|&nbsp; 膽命中≥1的比例：${danRate1Plus}%</p><p>🎲 配腳平均命中數：<span class="metric">${tuoAvgHit}</span> / 6</p></div>
-                    <table class="stat-table"><thead><tr><th>膽命中</th><th>0</th><th>1</th><th>2</th><tr></thead><tbody>${danRow}</tbody></table>
-                    <table class="stat-table" style="margin-top:12px"><thead><tr><th>配腳命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><tr></thead><tbody>${tuoRow}</tbody></table>
+                    <table class="stat-table"><thead><tr><th>膽命中</th><th>0</th><th>1</th><th>2</th></table></thead><tbody>${danRow}</tbody></table>
+                    <table class="stat-table" style="margin-top:12px"><thead><tr><th>配腳命中</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead><tbody>${tuoRow}</tbody></tr>
                     <div class="chart-container"><canvas id="dantuoChart"></canvas></div>
                 </div>
             </div>
