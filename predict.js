@@ -1,22 +1,33 @@
-// ==================== 多特征集成预测模型（确定性） ====================
-// 每个子预测器输出号码得分(0-1)，加权求和后得到综合得分
-// 基于综合得分，使用确定性规则生成多注（无随机）
+// ==================== 多特征集成预测模型 v3.0 ====================
+// 导出：predictTicketsFixed, getTopNumbersByScore
 
-// 可调权重（用户可修改）
+// ------------------- 可调权重（用户可手动修改） -------------------
 const WEIGHTS = {
-    longFreq: 0.15,     // 长期频率
-    shortActive: 0.15,  // 短期活跃
-    maTrend: 0.10,      // 移动平均趋势
-    sumDev: 0.10,       // 和值偏差
-    parity: 0.08,       // 奇偶比
-    region: 0.08,       // 区间分布
-    span: 0.07,         // 跨度
-    tail: 0.10,         // 尾数
-    consecutive: 0.07,  // 连号
-    markov: 0.10        // 马尔可夫
+    // 基本统计特征
+    longFreq: 0.08,
+    shortFreq: 0.08,
+    zscore: 0.06,
+    maDensity: 0.06,
+    // 时序特征
+    markov1: 0.06,
+    markov2: 0.04,
+    ar2: 0.04,
+    // 组合特征
+    sumDev: 0.06,
+    parity: 0.06,
+    region: 0.06,
+    span: 0.04,
+    tail: 0.06,
+    consecutive: 0.04,
+    // 高级特征
+    gapReg: 0.06,
+    bayesPost: 0.06,
+    ensembleVote: 0.10,
+    // 区间交叉特征
+    crossSum: 0.04
 };
 
-// 辅助：归一化数组（1-49）
+// 辅助函数
 function normalize(scores) {
     let max = Math.max(...scores.slice(1));
     if (max === 0) return scores;
@@ -25,8 +36,7 @@ function normalize(scores) {
     return norm;
 }
 
-// ------------------- 子预测器 -------------------
-// 1. 长期频率
+// ---------- 1. 基本统计特征 ----------
 function scoreLongFreq(dataSeries, currentIdx) {
     const freq = new Array(50).fill(0);
     for (let i = 0; i < currentIdx; i++) {
@@ -36,43 +46,138 @@ function scoreLongFreq(dataSeries, currentIdx) {
     return normalize(freq);
 }
 
-// 2. 短期活跃（最近15期）
-function scoreShortActive(dataSeries, currentIdx) {
-    const active = new Array(50).fill(0);
+function scoreShortFreq(dataSeries, currentIdx) {
+    const freq = new Array(50).fill(0);
     const start = Math.max(0, currentIdx - 15);
     for (let i = start; i < currentIdx; i++) {
         const row = dataSeries[i];
-        [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6].forEach(n => active[n]++);
+        [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6].forEach(n => freq[n]++);
     }
-    return normalize(active);
+    return normalize(freq);
 }
 
-// 3. 移动平均趋势（比较近3期与近10期密度）
-function scoreMATrend(dataSeries, currentIdx) {
-    const short = new Array(50).fill(0);
-    const long = new Array(50).fill(0);
-    const shortWin = 3, longWin = 10;
+function scoreZScore(dataSeries, currentIdx) {
+    // 计算每个号码的历史出现次数均值和标准差，然后标准化
+    const counts = new Array(50).fill(0);
+    for (let i = 0; i < currentIdx; i++) {
+        const row = dataSeries[i];
+        [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6].forEach(n => counts[n]++);
+    }
+    const mean = counts.reduce((a,b) => a+b, 0) / 49;
+    let variance = 0;
+    for (let i = 1; i <= 49; i++) variance += (counts[i] - mean) ** 2;
+    const std = Math.sqrt(variance / 49);
+    const scores = new Array(50).fill(0);
+    for (let i = 1; i <= 49; i++) {
+        scores[i] = (counts[i] - mean) / (std === 0 ? 1 : std);
+    }
+    // 将 Z-Score 映射到 0-1（使用逻辑函数）
+    for (let i = 1; i <= 49; i++) scores[i] = 1 / (1 + Math.exp(-scores[i] / 1.5));
+    return normalize(scores);
+}
+
+function scoreMADensity(dataSeries, currentIdx) {
+    // 移动平均密度：最近5期与最近20期的比值
+    const shortWin = 5, longWin = 20;
+    const shortCount = new Array(50).fill(0);
+    const longCount = new Array(50).fill(0);
     for (let i = Math.max(0, currentIdx - shortWin); i < currentIdx; i++) {
         const row = dataSeries[i];
-        [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6].forEach(n => short[n]++);
+        [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6].forEach(n => shortCount[n]++);
     }
     for (let i = Math.max(0, currentIdx - longWin); i < currentIdx; i++) {
         const row = dataSeries[i];
-        [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6].forEach(n => long[n]++);
+        [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6].forEach(n => longCount[n]++);
     }
     const scores = new Array(50).fill(0);
     for (let i = 1; i <= 49; i++) {
-        const shortDensity = short[i] / shortWin;
-        const longDensity = long[i] / longWin;
+        const shortDensity = shortCount[i] / shortWin;
+        const longDensity = longCount[i] / longWin;
         if (longDensity === 0) scores[i] = shortDensity > 0 ? 1 : 0;
         else scores[i] = Math.min(1.2, shortDensity / longDensity);
     }
     return normalize(scores);
 }
 
-// 4. 和值偏差预测
+// ---------- 2. 时序特征 ----------
+function scoreMarkov1(dataSeries, currentIdx) {
+    if (currentIdx < 2) return new Array(50).fill(0.5);
+    const trans = new Array(50).fill(0);
+    let total = 0;
+    const start = Math.max(0, currentIdx - 50);
+    for (let t = start+1; t < currentIdx; t++) {
+        const prevRow = dataSeries[t-1];
+        const curRow = dataSeries[t];
+        const prevSet = new Set([prevRow.n1, prevRow.n2, prevRow.n3, prevRow.n4, prevRow.n5, prevRow.n6]);
+        const curSet = new Set([curRow.n1, curRow.n2, curRow.n3, curRow.n4, curRow.n5, curRow.n6]);
+        for (let p of prevSet) {
+            for (let c of curSet) {
+                trans[c]++;
+                total++;
+            }
+        }
+    }
+    const lastRow = dataSeries[currentIdx-1];
+    const lastSet = new Set([lastRow.n1, lastRow.n2, lastRow.n3, lastRow.n4, lastRow.n5, lastRow.n6]);
+    const scores = new Array(50).fill(0);
+    for (let c = 1; c <= 49; c++) {
+        let sum = 0;
+        for (let p of lastSet) sum += trans[c];
+        scores[c] = sum;
+    }
+    return normalize(scores);
+}
+
+function scoreMarkov2(dataSeries, currentIdx) {
+    // 二阶马尔可夫：基于前两期组合
+    if (currentIdx < 3) return new Array(50).fill(0.5);
+    const trans = new Array(50).fill(0);
+    const start = Math.max(0, currentIdx - 50);
+    for (let t = start+2; t < currentIdx; t++) {
+        const prev1Row = dataSeries[t-2];
+        const prev2Row = dataSeries[t-1];
+        const curRow = dataSeries[t];
+        const prevSet = new Set([prev1Row.n1, prev1Row.n2, prev1Row.n3, prev1Row.n4, prev1Row.n5, prev1Row.n6,
+                                 prev2Row.n1, prev2Row.n2, prev2Row.n3, prev2Row.n4, prev2Row.n5, prev2Row.n6]);
+        const curSet = new Set([curRow.n1, curRow.n2, curRow.n3, curRow.n4, curRow.n5, curRow.n6]);
+        for (let p of prevSet) {
+            for (let c of curSet) {
+                trans[c]++;
+            }
+        }
+    }
+    const last1 = dataSeries[currentIdx-2];
+    const last2 = dataSeries[currentIdx-1];
+    const lastSet = new Set([last1.n1, last1.n2, last1.n3, last1.n4, last1.n5, last1.n6,
+                             last2.n1, last2.n2, last2.n3, last2.n4, last2.n5, last2.n6]);
+    const scores = new Array(50).fill(0);
+    for (let c = 1; c <= 49; c++) {
+        let sum = 0;
+        for (let p of lastSet) sum += trans[c];
+        scores[c] = sum;
+    }
+    return normalize(scores);
+}
+
+function scoreAR2(dataSeries, currentIdx) {
+    // 简单AR(2)预测每个号码的出现概率（用过去两期是否出现作为因子）
+    if (currentIdx < 2) return new Array(50).fill(0.5);
+    const last1 = dataSeries[currentIdx-1];
+    const last2 = dataSeries[currentIdx-2];
+    const last1Set = new Set([last1.n1, last1.n2, last1.n3, last1.n4, last1.n5, last1.n6]);
+    const last2Set = new Set([last2.n1, last2.n2, last2.n3, last2.n4, last2.n5, last2.n6]);
+    const scores = new Array(50).fill(0);
+    for (let i = 1; i <= 49; i++) {
+        let score = 0.5;
+        if (last1Set.has(i)) score += 0.3;
+        if (last2Set.has(i)) score += 0.2;
+        scores[i] = Math.min(1, score);
+    }
+    return normalize(scores);
+}
+
+// ---------- 3. 组合特征 ----------
 function scoreSumDev(dataSeries, currentIdx) {
-    // 计算过去30期的和值序列
     const sums = [];
     const start = Math.max(0, currentIdx - 30);
     for (let i = start; i < currentIdx; i++) {
@@ -81,10 +186,7 @@ function scoreSumDev(dataSeries, currentIdx) {
         sums.push(sum);
     }
     if (sums.length < 5) return new Array(50).fill(0.5);
-    // 预测下一期和值（简单移动平均）
-    const recent3 = sums.slice(-3);
-    const predictedSum = recent3.reduce((a,b)=>a+b,0) / recent3.length;
-    // 统计每个号码出现时，该期和值与预测值的偏差（偏差越小得分越高）
+    const predictedSum = sums.slice(-3).reduce((a,b)=>a+b,0) / 3;
     const diffMap = new Array(50).fill(0);
     const countMap = new Array(50).fill(0);
     for (let i = start; i < currentIdx; i++) {
@@ -104,7 +206,6 @@ function scoreSumDev(dataSeries, currentIdx) {
     return normalize(scores);
 }
 
-// 5. 奇偶比预测
 function scoreParity(dataSeries, currentIdx) {
     const parityRates = [];
     const start = Math.max(0, currentIdx - 20);
@@ -114,7 +215,6 @@ function scoreParity(dataSeries, currentIdx) {
         [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6].forEach(n => { if (n % 2 === 1) oddCount++; });
         parityRates.push(oddCount);
     }
-    if (parityRates.length === 0) return new Array(50).fill(0.5);
     const predictedOdd = Math.round(parityRates.slice(-5).reduce((a,b)=>a+b,0) / 5);
     const scores = new Array(50).fill(0);
     for (let i = 1; i <= 49; i++) {
@@ -124,7 +224,6 @@ function scoreParity(dataSeries, currentIdx) {
     return normalize(scores);
 }
 
-// 6. 区间分布预测（5个区间）
 function scoreRegion(dataSeries, currentIdx) {
     const regions = [[1,10],[11,20],[21,30],[31,40],[41,49]];
     const regionCounts = new Array(5).fill(0);
@@ -149,7 +248,6 @@ function scoreRegion(dataSeries, currentIdx) {
     return normalize(scores);
 }
 
-// 7. 跨度预测
 function scoreSpan(dataSeries, currentIdx) {
     const spans = [];
     const start = Math.max(0, currentIdx - 20);
@@ -178,7 +276,6 @@ function scoreSpan(dataSeries, currentIdx) {
     return normalize(scores);
 }
 
-// 8. 尾数分布预测
 function scoreTail(dataSeries, currentIdx) {
     const tailCounts = new Array(10).fill(0);
     const start = Math.max(0, currentIdx - 20);
@@ -192,7 +289,6 @@ function scoreTail(dataSeries, currentIdx) {
     return normalize(scores);
 }
 
-// 9. 连号倾向预测
 function scoreConsecutive(dataSeries, currentIdx) {
     const consecCount = new Array(50).fill(0);
     const start = Math.max(0, currentIdx - 50);
@@ -209,61 +305,139 @@ function scoreConsecutive(dataSeries, currentIdx) {
     return normalize(consecCount);
 }
 
-// 10. 马尔可夫链（基于上期号码）
-function scoreMarkov(dataSeries, currentIdx) {
-    if (currentIdx < 2) return new Array(50).fill(0.5);
-    const trans = new Array(50).fill(0);
-    let total = 0;
-    const start = Math.max(0, currentIdx - 50);
-    for (let t = start + 1; t < currentIdx; t++) {
-        const prevRow = dataSeries[t-1];
-        const curRow = dataSeries[t];
-        const prevSet = new Set([prevRow.n1, prevRow.n2, prevRow.n3, prevRow.n4, prevRow.n5, prevRow.n6]);
-        const curSet = new Set([curRow.n1, curRow.n2, curRow.n3, curRow.n4, curRow.n5, curRow.n6]);
-        for (let p of prevSet) {
-            for (let c of curSet) {
-                trans[c]++;
-                total++;
+// ---------- 4. 高级特征 ----------
+function scoreGapRegression(dataSeries, currentIdx) {
+    // 基于平均遗漏间隔
+    const lastSeen = new Array(50).fill(-1);
+    const intervals = new Array(50).fill(0);
+    const counts = new Array(50).fill(0);
+    for (let t = 0; t < currentIdx; t++) {
+        const row = dataSeries[t];
+        const nums = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6];
+        for (let n of nums) {
+            if (lastSeen[n] !== -1) {
+                intervals[n] += (t - lastSeen[n]);
+                counts[n]++;
             }
+            lastSeen[n] = t;
         }
     }
-    const lastRow = dataSeries[currentIdx-1];
-    const lastSet = new Set([lastRow.n1, lastRow.n2, lastRow.n3, lastRow.n4, lastRow.n5, lastRow.n6]);
+    const avgGap = new Array(50);
+    for (let i = 1; i <= 49; i++) {
+        if (counts[i] > 0) avgGap[i] = intervals[i] / counts[i];
+        else avgGap[i] = 20;
+    }
+    const currentGap = new Array(50);
+    for (let i = 1; i <= 49; i++) {
+        if (lastSeen[i] === -1) currentGap[i] = 999;
+        else currentGap[i] = currentIdx - lastSeen[i] - 1;
+    }
     const scores = new Array(50).fill(0);
-    for (let c = 1; c <= 49; c++) {
-        let sum = 0;
-        for (let p of lastSet) sum += trans[c];
-        scores[c] = sum;
+    for (let i = 1; i <= 49; i++) {
+        let ratio = currentGap[i] / avgGap[i];
+        scores[i] = Math.min(1, ratio / 1.5);
     }
     return normalize(scores);
 }
 
-// ------------------- 综合评分 -------------------
-function getCombinedScores(dataSeries, currentIdx) {
+function scoreBayesPosterior(dataSeries, currentIdx) {
+    // 简单贝叶斯更新：以历史频率为先验，以最近5期的频率为似然，计算后验
+    const prior = new Array(50).fill(0);
+    for (let i = 0; i < currentIdx; i++) {
+        const row = dataSeries[i];
+        [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6].forEach(n => prior[n]++);
+    }
+    const totalPrior = prior.reduce((a,b)=>a+b, 0);
+    for (let i = 1; i <= 49; i++) prior[i] = (prior[i] + 1) / (totalPrior + 49); // 拉普拉斯平滑
+    const likelihood = new Array(50).fill(0);
+    const start = Math.max(0, currentIdx - 5);
+    let totalLike = 0;
+    for (let i = start; i < currentIdx; i++) {
+        const row = dataSeries[i];
+        [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6].forEach(n => { likelihood[n]++; totalLike++; });
+    }
+    for (let i = 1; i <= 49; i++) likelihood[i] = (likelihood[i] + 1) / (totalLike + 49);
+    const posterior = new Array(50).fill(0);
+    for (let i = 1; i <= 49; i++) posterior[i] = prior[i] * likelihood[i];
+    return normalize(posterior);
+}
+
+function scoreEnsembleVote(dataSeries, currentIdx) {
+    // 集成投票：收集几个关键子预测器的排名，投票计分
+    const subScores = [
+        scoreLongFreq(dataSeries, currentIdx),
+        scoreShortFreq(dataSeries, currentIdx),
+        scoreMADensity(dataSeries, currentIdx),
+        scoreMarkov1(dataSeries, currentIdx),
+        scoreSumDev(dataSeries, currentIdx),
+        scoreRegion(dataSeries, currentIdx),
+        scoreTail(dataSeries, currentIdx),
+        scoreGapRegression(dataSeries, currentIdx)
+    ];
+    const votes = new Array(50).fill(0);
+    for (let s of subScores) {
+        const ranked = Array.from({length:49}, (_,i)=>i+1).sort((a,b) => s[b] - s[a]);
+        for (let i = 0; i < 10; i++) votes[ranked[i]] += (10 - i);
+    }
+    return normalize(votes);
+}
+
+function scoreCrossSum(dataSeries, currentIdx) {
+    // 交叉和值特征：将号码拆成十位和个位之和
+    const sumDigits = new Array(50).fill(0);
+    const start = Math.max(0, currentIdx - 20);
+    for (let i = start; i < currentIdx; i++) {
+        const row = dataSeries[i];
+        const nums = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6];
+        for (let n of nums) {
+            const tens = Math.floor(n / 10);
+            const ones = n % 10;
+            sumDigits[tens + ones]++;
+        }
+    }
     const scores = new Array(50).fill(0);
-    const features = {
+    const maxSum = Math.max(...sumDigits.slice(1));
+    for (let i = 1; i <= 49; i++) {
+        const tens = Math.floor(i / 10);
+        const ones = i % 10;
+        scores[i] = sumDigits[tens + ones] / maxSum;
+    }
+    return normalize(scores);
+}
+
+// ---------- 综合评分（加权投票） ----------
+function getCombinedScores(dataSeries, currentIdx) {
+    const featureScores = {
         longFreq: scoreLongFreq(dataSeries, currentIdx),
-        shortActive: scoreShortActive(dataSeries, currentIdx),
-        maTrend: scoreMATrend(dataSeries, currentIdx),
+        shortFreq: scoreShortFreq(dataSeries, currentIdx),
+        zscore: scoreZScore(dataSeries, currentIdx),
+        maDensity: scoreMADensity(dataSeries, currentIdx),
+        markov1: scoreMarkov1(dataSeries, currentIdx),
+        markov2: scoreMarkov2(dataSeries, currentIdx),
+        ar2: scoreAR2(dataSeries, currentIdx),
         sumDev: scoreSumDev(dataSeries, currentIdx),
         parity: scoreParity(dataSeries, currentIdx),
         region: scoreRegion(dataSeries, currentIdx),
         span: scoreSpan(dataSeries, currentIdx),
         tail: scoreTail(dataSeries, currentIdx),
         consecutive: scoreConsecutive(dataSeries, currentIdx),
-        markov: scoreMarkov(dataSeries, currentIdx)
+        gapReg: scoreGapRegression(dataSeries, currentIdx),
+        bayesPost: scoreBayesPosterior(dataSeries, currentIdx),
+        ensembleVote: scoreEnsembleVote(dataSeries, currentIdx),
+        crossSum: scoreCrossSum(dataSeries, currentIdx)
     };
+    const combined = new Array(50).fill(0);
     for (let i = 1; i <= 49; i++) {
         let total = 0;
-        for (let [key, arr] of Object.entries(features)) {
-            total += WEIGHTS[key] * arr[i];
+        for (let [name, scores] of Object.entries(featureScores)) {
+            if (WEIGHTS[name] !== undefined) total += WEIGHTS[name] * scores[i];
         }
-        scores[i] = total;
+        combined[i] = total;
     }
-    return normalize(scores);
+    return normalize(combined);
 }
 
-// ------------------- 对外接口 -------------------
+// ---------- 对外接口 ----------
 export function getTopNumbersByScore(dataSeries, count, exclude = []) {
     if (!dataSeries || dataSeries.length === 0) return [];
     const scores = getCombinedScores(dataSeries, dataSeries.length);
@@ -278,13 +452,12 @@ export function predictTicketsFixed(dataSeries, nTickets) {
     const scores = getCombinedScores(dataSeries, dataSeries.length);
     let allNumbers = Array.from({ length: 49 }, (_, i) => i + 1);
     allNumbers.sort((a, b) => scores[b] - scores[a]);
-    
+
     const top6 = allNumbers.slice(0, 6);
     const top7_12 = allNumbers.slice(6, 12);
     const top13_18 = allNumbers.slice(12, 18);
-    
+
     const tickets = [];
-    // 第一注：最高分6个
     tickets.push([...top6].sort((a,b)=>a-b));
     if (nTickets >= 2) {
         const second = [...top6.slice(0,3), ...top7_12.slice(0,3)];
